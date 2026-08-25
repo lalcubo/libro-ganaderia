@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    VENEZUELA GANADERA 2030 - FLIPBOOK ESTILOS PROFESIONALES
    ========================================================================== */
 
@@ -732,8 +732,14 @@ body {
     font-size: 0.72rem;
   }
 
-  #btn-help, #btn-zoom-reset, .btn-nav-control span {
+  #btn-help, .btn-nav-control span {
     display: none;
+  }
+
+  #btn-zoom-reset {
+    display: inline-flex;
+    padding: 0 4px;
+    font-size: 0.7rem;
   }
 
   .icon-btn {

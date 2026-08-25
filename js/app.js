@@ -7,7 +7,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const TOTAL_PAGES = 34;
   let pageFlip = null;
   let soundEnabled = true;
-  let zoomLevel = 1.0;
+
+  // Zoom inicial: 1.85x en móviles (para lectura grande y clara) y 1.0x en escritorio
+  const isMobileInitial = window.innerWidth <= 768;
+  let zoomLevel = isMobileInitial ? 1.85 : 1.0;
+
   let isDragging = false;
   let startX = 0, startY = 0;
   let translateX = 0, translateY = 0;
@@ -146,7 +150,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 3. Inicializar PageFlip con dimensiones maximizadas para móvil
+  // 3. Inicializar PageFlip
   function initFlipbook() {
     generatePagesHTML();
     generateThumbnails();
@@ -155,18 +159,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
-    // Relación de aspecto estándar 1533 / 2246 = ~0.6825
+    // Relación de aspecto 1533 / 2246 = ~0.6825
     const pageRatio = 1533 / 2246;
 
     let baseWidth = 550;
     let baseHeight = Math.round(550 / pageRatio);
 
     if (isMobile) {
-      // En móvil calcular el mayor tamaño posible llenando el alto/ancho disponible
       const availableHeight = viewportHeight - 110;
-      const availableWidth = viewportWidth * 0.98;
-
-      let calcWidth = availableWidth;
+      let calcWidth = viewportWidth * 0.96;
       let calcHeight = Math.round(calcWidth / pageRatio);
 
       if (calcHeight > availableHeight) {
@@ -208,6 +209,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Cargar páginas desde el DOM
     pageFlip.loadFromHTML(document.querySelectorAll(".page"));
+
+    // Aplicar zoom inicial
+    applyZoom();
 
     // Eventos del Flipbook
     pageFlip.on("flip", (e) => {
@@ -270,7 +274,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // 5. Controles de Zoom y Pan (Arrastre)
   function applyZoom() {
     panContainer.style.transform = `scale(${zoomLevel}) translate(${translateX}px, ${translateY}px)`;
-    zoomLevelText.textContent = `${Math.round(zoomLevel * 100)}%`;
+    if (zoomLevelText) {
+      zoomLevelText.textContent = `${Math.round(zoomLevel * 100)}%`;
+    }
     panContainer.classList.toggle("is-zoomed", zoomLevel > 1.0);
     if (zoomLevel <= 1.0) {
       translateX = 0;
@@ -280,13 +286,20 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function setZoom(newZoom) {
-    zoomLevel = Math.min(Math.max(newZoom, 1.0), 2.5);
+    zoomLevel = Math.min(Math.max(newZoom, 1.0), 2.6);
     applyZoom();
   }
 
   btnZoomIn.addEventListener("click", () => setZoom(zoomLevel + 0.3));
   btnZoomOut.addEventListener("click", () => setZoom(zoomLevel - 0.3));
-  btnZoomReset.addEventListener("click", () => setZoom(1.0));
+  btnZoomReset.addEventListener("click", () => {
+    // Alternar entre Zoom 1.85x y 1.0x si se pulsa el indicador
+    if (zoomLevel > 1.2) {
+      setZoom(1.0);
+    } else {
+      setZoom(1.85);
+    }
+  });
 
   // Pan con Mouse (Escritorio cuando hay Zoom)
   panContainer.addEventListener("mousedown", (e) => {
@@ -349,13 +362,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const elapsed = Date.now() - touchStartTime;
     const screenWidth = window.innerWidth;
 
-    // Doble toque (Double Tap) para zoom rápido en móviles
+    // Doble toque (Double Tap) para alternar zoom en móviles
     const now = Date.now();
-    if (!touchMoved && now - lastTapTime < 300) {
-      if (zoomLevel > 1.0) {
+    if (!touchMoved && now - lastTapTime < 320) {
+      if (zoomLevel > 1.2) {
         setZoom(1.0);
       } else {
-        setZoom(1.7);
+        setZoom(1.85);
       }
       lastTapTime = 0;
       return;
@@ -363,21 +376,21 @@ document.addEventListener("DOMContentLoaded", () => {
     lastTapTime = now;
 
     // 1. Detección de Swipe Horizontal Rápido (Deslizar dedo para pasar página)
-    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2 && elapsed < 400) {
-      if (deltaX < -40) {
+    if (Math.abs(deltaX) > 35 && Math.abs(deltaX) > Math.abs(deltaY) * 1.15 && elapsed < 450) {
+      if (deltaX < -35) {
         if (pageFlip) pageFlip.flipNext();
-      } else if (deltaX > 40) {
+      } else if (deltaX > 35) {
         if (pageFlip) pageFlip.flipPrev();
       }
       return;
     }
 
     // 2. Toque rápido en los bordes de la pantalla (Tap to Flip)
-    if (!touchMoved && elapsed < 250 && zoomLevel <= 1.1) {
+    if (!touchMoved && elapsed < 250) {
       const clickX = touch.clientX;
-      if (clickX > screenWidth * 0.75) {
+      if (clickX > screenWidth * 0.78) {
         if (pageFlip) pageFlip.flipNext();
-      } else if (clickX < screenWidth * 0.25) {
+      } else if (clickX < screenWidth * 0.22) {
         if (pageFlip) pageFlip.flipPrev();
       }
     }
