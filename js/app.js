@@ -12,9 +12,17 @@ document.addEventListener("DOMContentLoaded", () => {
   let startX = 0, startY = 0;
   let translateX = 0, translateY = 0;
 
+  // Variables táctiles para gestos móviles (Swipe vs Pan)
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchStartTime = 0;
+  let touchMoved = false;
+  let lastTapTime = 0;
+
   // Elementos del DOM
   const flipbookEl = document.getElementById("flipbook");
   const panContainer = document.getElementById("pan-container");
+  const viewportEl = document.getElementById("viewport");
   const loadingScreen = document.getElementById("loading-screen");
   const loaderProgress = document.getElementById("loader-progress");
   const loaderText = document.getElementById("loader-text");
@@ -54,11 +62,6 @@ document.addEventListener("DOMContentLoaded", () => {
         audioCtx.resume();
       }
       
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      const filter = audioCtx.createBiquadFilter();
-
-      // Ruido suave de paso de página
       const bufferSize = audioCtx.sampleRate * 0.12;
       const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
       const data = buffer.getChannelData(0);
@@ -69,10 +72,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const noise = audioCtx.createBufferSource();
       noise.buffer = buffer;
 
+      const filter = audioCtx.createBiquadFilter();
       filter.type = 'lowpass';
       filter.frequency.setValueAtTime(800, audioCtx.currentTime);
       filter.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.12);
 
+      const gain = audioCtx.createGain();
       gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
 
@@ -135,7 +140,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 3. Inicializar PageFlip
+  // 3. Inicializar PageFlip con dimensiones maximizadas para móvil
   function initFlipbook() {
     generatePagesHTML();
     generateThumbnails();
@@ -144,13 +149,27 @@ document.addEventListener("DOMContentLoaded", () => {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
-    // Dimensiones base por página (Relación estándar carta 1:1.29)
+    // Relación de aspecto estándar 1533 / 2246 = ~0.6825
+    const pageRatio = 1533 / 2246;
+
     let baseWidth = 550;
-    let baseHeight = 712;
+    let baseHeight = Math.round(550 / pageRatio);
 
     if (isMobile) {
-      baseWidth = Math.min(viewportWidth * 0.92, 450);
-      baseHeight = baseWidth * 1.294;
+      // En móvil calcular el mayor tamaño posible llenando el alto/ancho disponible
+      const availableHeight = viewportHeight - 110; // descontando barras sup e inf
+      const availableWidth = viewportWidth * 0.98;
+
+      let calcWidth = availableWidth;
+      let calcHeight = Math.round(calcWidth / pageRatio);
+
+      if (calcHeight > availableHeight) {
+        calcHeight = availableHeight;
+        calcWidth = Math.round(calcHeight * pageRatio);
+      }
+
+      baseWidth = Math.max(calcWidth, 320);
+      baseHeight = Math.max(calcHeight, 460);
     }
 
     const PageFlipConstructor = (typeof St !== 'undefined' && St.PageFlip) 
@@ -167,15 +186,15 @@ document.addEventListener("DOMContentLoaded", () => {
       height: baseHeight,
       size: "stretch",
       minWidth: 280,
-      maxWidth: 900,
-      minHeight: 360,
-      maxHeight: 1200,
+      maxWidth: 1200,
+      minHeight: 400,
+      maxHeight: 1600,
       maxShadowOpacity: 0.55,
       showCover: true,
       mobileScrollSupport: false,
       usePortrait: true,
       startPage: 0,
-      flippingTime: 700,
+      flippingTime: 600,
       drawShadow: true,
       autoSize: true,
       useMouseEvents: true
@@ -188,6 +207,12 @@ document.addEventListener("DOMContentLoaded", () => {
     pageFlip.on("flip", (e) => {
       playPageFlipSound();
       updateUIState(e.data);
+      if (zoomLevel > 1.0) {
+        // recentrar suavemente la página al pasar
+        translateX = 0;
+        translateY = 0;
+        applyZoom();
+      }
     });
 
     pageFlip.on("changeState", (e) => {
@@ -202,8 +227,8 @@ document.addEventListener("DOMContentLoaded", () => {
       loaderText.textContent = "100%";
       setTimeout(() => {
         loadingScreen.classList.add("hidden");
-      }, 400);
-    }, 600);
+      }, 350);
+    }, 500);
   }
 
   // 4. Actualizar estado de la UI
@@ -250,11 +275,11 @@ document.addEventListener("DOMContentLoaded", () => {
     applyZoom();
   }
 
-  btnZoomIn.addEventListener("click", () => setZoom(zoomLevel + 0.25));
-  btnZoomOut.addEventListener("click", () => setZoom(zoomLevel - 0.25));
+  btnZoomIn.addEventListener("click", () => setZoom(zoomLevel + 0.3));
+  btnZoomOut.addEventListener("click", () => setZoom(zoomLevel - 0.3));
   btnZoomReset.addEventListener("click", () => setZoom(1.0));
 
-  // Pan (Arrastre cuando hay Zoom)
+  // Pan con Mouse (Escritorio cuando hay Zoom)
   panContainer.addEventListener("mousedown", (e) => {
     if (zoomLevel <= 1.0) return;
     isDragging = true;
@@ -277,26 +302,84 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Touch Pan para móviles con Zoom
-  panContainer.addEventListener("touchstart", (e) => {
-    if (zoomLevel <= 1.0 || e.touches.length !== 1) return;
-    isDragging = true;
-    startX = e.touches[0].clientX - translateX;
-    startY = e.touches[0].clientY - translateY;
+  // 6. GESTOS TÁCTILES INTELIGENTES PARA MÓVILES (Swipe para pasar página + Pan + Tap en esquinas)
+  viewportEl.addEventListener("touchstart", (e) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+      touchStartTime = Date.now();
+      touchMoved = false;
+
+      if (zoomLevel > 1.0) {
+        isDragging = true;
+        startX = touch.clientX - translateX;
+        startY = touch.clientY - translateY;
+      }
+    }
   }, { passive: true });
 
-  window.addEventListener("touchmove", (e) => {
-    if (!isDragging || e.touches.length !== 1) return;
-    translateX = e.touches[0].clientX - startX;
-    translateY = e.touches[0].clientY - startY;
-    applyZoom();
+  viewportEl.addEventListener("touchmove", (e) => {
+    if (e.touches.length === 1) {
+      touchMoved = true;
+      if (isDragging && zoomLevel > 1.0) {
+        translateX = e.touches[0].clientX - startX;
+        translateY = e.touches[0].clientY - startY;
+        applyZoom();
+      }
+    }
   }, { passive: true });
 
-  window.addEventListener("touchend", () => {
+  viewportEl.addEventListener("touchend", (e) => {
     isDragging = false;
+    if (e.changedTouches.length !== 1) return;
+
+    const touch = e.changedTouches[0];
+    const deltaX = touch.clientX - touchStartX;
+    const deltaY = touch.clientY - touchStartY;
+    const elapsed = Date.now() - touchStartTime;
+    const screenWidth = window.innerWidth;
+
+    // Doble toque (Double Tap) para zoom rápido en móviles
+    const now = Date.now();
+    if (!touchMoved && now - lastTapTime < 300) {
+      // Alternar entre Zoom 1.7x y 1.0x
+      if (zoomLevel > 1.0) {
+        setZoom(1.0);
+      } else {
+        setZoom(1.7);
+      }
+      lastTapTime = 0;
+      return;
+    }
+    lastTapTime = now;
+
+    // 1. Detección de Swipe Horizontal Rápido (Deslizar dedo para pasar página)
+    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2 && elapsed < 400) {
+      if (deltaX < -40) {
+        // Deslizó hacia la izquierda -> Página siguiente
+        if (pageFlip) pageFlip.flipNext();
+      } else if (deltaX > 40) {
+        // Deslizó hacia la derecha -> Página anterior
+        if (pageFlip) pageFlip.flipPrev();
+      }
+      return;
+    }
+
+    // 2. Toque rápido en los bordes de la pantalla (Tap to Flip)
+    if (!touchMoved && elapsed < 250 && zoomLevel <= 1.1) {
+      const clickX = touch.clientX;
+      if (clickX > screenWidth * 0.75) {
+        // Toque en el tercio derecho
+        if (pageFlip) pageFlip.flipNext();
+      } else if (clickX < screenWidth * 0.25) {
+        // Toque en el tercio izquierdo
+        if (pageFlip) pageFlip.flipPrev();
+      }
+    }
   });
 
-  // 6. Navegación
+  // 7. Navegación con Botones
   btnPrev.addEventListener("click", () => pageFlip && pageFlip.flipPrev());
   btnNext.addEventListener("click", () => pageFlip && pageFlip.flipNext());
   btnBottomPrev.addEventListener("click", () => pageFlip && pageFlip.flipPrev());
@@ -312,7 +395,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // 7. Miniaturas
+  // 8. Miniaturas
   function openThumbnails() {
     thumbnailsDrawer.classList.add("open");
     const activeThumb = thumbnailsContainer.querySelector(".thumb-item.active");
@@ -337,7 +420,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   btnCloseThumbnails.addEventListener("click", closeThumbnails);
 
-  // 8. Sonido Toggle
+  // 9. Sonido Toggle
   btnSound.addEventListener("click", () => {
     soundEnabled = !soundEnabled;
     btnSound.classList.toggle("active", soundEnabled);
@@ -352,7 +435,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // 9. Pantalla Completa
+  // 10. Pantalla Completa
   btnFullscreen.addEventListener("click", () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(err => {
@@ -376,16 +459,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // 10. Modal Ayuda
+  // 11. Modal Ayuda
   btnHelp.addEventListener("click", () => helpModal.classList.add("open"));
   btnCloseHelp.addEventListener("click", () => helpModal.classList.remove("open"));
   helpModal.addEventListener("click", (e) => {
     if (e.target === helpModal) helpModal.classList.remove("open");
   });
 
-  // 11. Atajos de Teclado
+  // 12. Atajos de Teclado
   window.addEventListener("keydown", (e) => {
-    // Si modal está abierto, cerrar con Esc
     if (e.key === "Escape") {
       if (helpModal.classList.contains("open")) {
         helpModal.classList.remove("open");
@@ -418,13 +500,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // 12. Soporte para redimensionar la ventana fluidamente
+  // 13. Redimensionar adaptativo
   let resizeTimeout;
   window.addEventListener("resize", () => {
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(() => {
       if (pageFlip) {
-        // Redimensionar libro
         pageFlip.updateFromHtml(document.querySelectorAll(".page"));
       }
     }, 250);
