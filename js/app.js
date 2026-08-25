@@ -8,13 +8,36 @@ document.addEventListener("DOMContentLoaded", () => {
   let pageFlip = null;
   let soundEnabled = true;
 
-  // Zoom inicial: 1.85x en móviles (para lectura grande y clara) y 1.0x en escritorio
+  // Zoom inicial: 1.35x en móviles (lectura cómoda sin desbordar) y 1.0x en escritorio
   const isMobileInitial = window.innerWidth <= 768;
-  let zoomLevel = isMobileInitial ? 1.85 : 1.0;
+  let zoomLevel = isMobileInitial ? 1.35 : 1.0;
 
   let isDragging = false;
   let startX = 0, startY = 0;
   let translateX = 0, translateY = 0;
+
+  // Control de transiciones para evitar saltos dobles de página
+  let lastFlipTime = 0;
+  function safeFlipNext() {
+    const now = Date.now();
+    if (now - lastFlipTime < 450) return;
+    lastFlipTime = now;
+    if (pageFlip) pageFlip.flipNext();
+  }
+
+  function safeFlipPrev() {
+    const now = Date.now();
+    if (now - lastFlipTime < 450) return;
+    lastFlipTime = now;
+    if (pageFlip) pageFlip.flipPrev();
+  }
+
+  function safeFlipTo(pageIndex) {
+    const now = Date.now();
+    if (now - lastFlipTime < 450) return;
+    lastFlipTime = now;
+    if (pageFlip) pageFlip.flip(pageIndex);
+  }
 
   // Variables táctiles para gestos móviles (Swipe vs Pan)
   let touchStartX = 0;
@@ -140,10 +163,8 @@ document.addEventListener("DOMContentLoaded", () => {
       thumbItem.appendChild(label);
 
       thumbItem.addEventListener("click", () => {
-        if (pageFlip) {
-          pageFlip.flip(i - 1);
-          closeThumbnails();
-        }
+        safeFlipTo(i - 1);
+        closeThumbnails();
       });
 
       thumbnailsContainer.appendChild(thumbItem);
@@ -159,7 +180,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
-    // Relación de aspecto 1533 / 2246 = ~0.6825
+    // Relación de aspecto estándar 1533 / 2246 = ~0.6825
     const pageRatio = 1533 / 2246;
 
     let baseWidth = 550;
@@ -167,7 +188,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (isMobile) {
       const availableHeight = viewportHeight - 110;
-      let calcWidth = viewportWidth * 0.96;
+      let calcWidth = viewportWidth * 0.95;
       let calcHeight = Math.round(calcWidth / pageRatio);
 
       if (calcHeight > availableHeight) {
@@ -201,7 +222,7 @@ document.addEventListener("DOMContentLoaded", () => {
       mobileScrollSupport: false,
       usePortrait: true,
       startPage: 0,
-      flippingTime: 600,
+      flippingTime: 550,
       drawShadow: true,
       autoSize: true,
       useMouseEvents: true
@@ -286,18 +307,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function setZoom(newZoom) {
-    zoomLevel = Math.min(Math.max(newZoom, 1.0), 2.6);
+    zoomLevel = Math.min(Math.max(newZoom, 1.0), 2.5);
     applyZoom();
   }
 
-  btnZoomIn.addEventListener("click", () => setZoom(zoomLevel + 0.3));
-  btnZoomOut.addEventListener("click", () => setZoom(zoomLevel - 0.3));
+  btnZoomIn.addEventListener("click", () => setZoom(zoomLevel + 0.25));
+  btnZoomOut.addEventListener("click", () => setZoom(zoomLevel - 0.25));
   btnZoomReset.addEventListener("click", () => {
-    // Alternar entre Zoom 1.85x y 1.0x si se pulsa el indicador
-    if (zoomLevel > 1.2) {
+    if (zoomLevel > 1.1) {
       setZoom(1.0);
     } else {
-      setZoom(1.85);
+      setZoom(1.35);
     }
   });
 
@@ -324,8 +344,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // 6. GESTOS TÁCTILES INTELIGENTES PARA MÓVILES (Swipe para pasar página + Pan + Tap en esquinas)
+  // 6. GESTOS TÁCTILES INTELIGENTES PARA MÓVILES (Swipe limpio sin disparar botones)
   viewportEl.addEventListener("touchstart", (e) => {
+    // Si se tocó un botón de control, ignorar el gesto global
+    if (e.target.closest("button") || e.target.closest(".nav-arrow") || e.target.closest(".icon-btn") || e.target.closest(".btn-nav-control")) {
+      return;
+    }
+
     if (e.touches.length === 1) {
       const touch = e.touches[0];
       touchStartX = touch.clientX;
@@ -354,61 +379,62 @@ document.addEventListener("DOMContentLoaded", () => {
 
   viewportEl.addEventListener("touchend", (e) => {
     isDragging = false;
+
+    // Si se tocó un botón de control, ignorar el handler global
+    if (e.target.closest("button") || e.target.closest(".nav-arrow") || e.target.closest(".icon-btn") || e.target.closest(".btn-nav-control")) {
+      return;
+    }
+
     if (e.changedTouches.length !== 1) return;
 
     const touch = e.changedTouches[0];
     const deltaX = touch.clientX - touchStartX;
     const deltaY = touch.clientY - touchStartY;
     const elapsed = Date.now() - touchStartTime;
-    const screenWidth = window.innerWidth;
 
     // Doble toque (Double Tap) para alternar zoom en móviles
     const now = Date.now();
-    if (!touchMoved && now - lastTapTime < 320) {
-      if (zoomLevel > 1.2) {
+    if (!touchMoved && now - lastTapTime < 300) {
+      if (zoomLevel > 1.1) {
         setZoom(1.0);
       } else {
-        setZoom(1.85);
+        setZoom(1.35);
       }
       lastTapTime = 0;
       return;
     }
     lastTapTime = now;
 
-    // 1. Detección de Swipe Horizontal Rápido (Deslizar dedo para pasar página)
-    if (Math.abs(deltaX) > 35 && Math.abs(deltaX) > Math.abs(deltaY) * 1.15 && elapsed < 450) {
-      if (deltaX < -35) {
-        if (pageFlip) pageFlip.flipNext();
-      } else if (deltaX > 35) {
-        if (pageFlip) pageFlip.flipPrev();
-      }
-      return;
-    }
-
-    // 2. Toque rápido en los bordes de la pantalla (Tap to Flip)
-    if (!touchMoved && elapsed < 250) {
-      const clickX = touch.clientX;
-      if (clickX > screenWidth * 0.78) {
-        if (pageFlip) pageFlip.flipNext();
-      } else if (clickX < screenWidth * 0.22) {
-        if (pageFlip) pageFlip.flipPrev();
+    // Gesto de Swipe Horizontal con el dedo (Deslizar para pasar página de 1 en 1)
+    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.25 && elapsed < 450) {
+      if (deltaX < -40) {
+        safeFlipNext();
+      } else if (deltaX > 40) {
+        safeFlipPrev();
       }
     }
   });
 
-  // 7. Navegación con Botones
-  btnPrev.addEventListener("click", () => pageFlip && pageFlip.flipPrev());
-  btnNext.addEventListener("click", () => pageFlip && pageFlip.flipNext());
-  btnBottomPrev.addEventListener("click", () => pageFlip && pageFlip.flipPrev());
-  btnBottomNext.addEventListener("click", () => pageFlip && pageFlip.flipNext());
-  btnFirst.addEventListener("click", () => pageFlip && pageFlip.flip(0));
-  btnLast.addEventListener("click", () => pageFlip && pageFlip.flip(TOTAL_PAGES - 1));
+  // 7. Navegación con Botones (Paso exacto de 1 en 1 con debounce)
+  function handleButtonNav(btn, action) {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      action();
+    });
+  }
+
+  handleButtonNav(btnPrev, safeFlipPrev);
+  handleButtonNav(btnNext, safeFlipNext);
+  handleButtonNav(btnBottomPrev, safeFlipPrev);
+  handleButtonNav(btnBottomNext, safeFlipNext);
+  handleButtonNav(btnFirst, () => safeFlipTo(0));
+  handleButtonNav(btnLast, () => safeFlipTo(TOTAL_PAGES - 1));
 
   // Slider
   pageSlider.addEventListener("input", (e) => {
     const targetPage = parseInt(e.target.value, 10) - 1;
     if (pageFlip && targetPage !== pageFlip.getCurrentPageIndex()) {
-      pageFlip.flip(targetPage);
+      safeFlipTo(targetPage);
     }
   });
 
@@ -501,13 +527,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (e.key === "ArrowLeft") {
-      if (pageFlip) pageFlip.flipPrev();
+      safeFlipPrev();
     } else if (e.key === "ArrowRight") {
-      if (pageFlip) pageFlip.flipNext();
+      safeFlipNext();
     } else if (e.key === "Home") {
-      if (pageFlip) pageFlip.flip(0);
+      safeFlipTo(0);
     } else if (e.key === "End") {
-      if (pageFlip) pageFlip.flip(TOTAL_PAGES - 1);
+      safeFlipTo(TOTAL_PAGES - 1);
     } else if (e.key === "+" || e.key === "=") {
       setZoom(zoomLevel + 0.25);
     } else if (e.key === "-") {
