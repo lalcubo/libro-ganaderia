@@ -6,23 +6,25 @@ let cachedProposals = [];
 let publicCurrentPage = 1;
 const ITEMS_PER_PAGE = 6;
 
-// Obtener propuestas desde la API de Vercel Postgres
 async function fetchProposalsFromAPI() {
+  const local = localStorage.getItem("vg2030_proposals");
+  cachedProposals = local ? JSON.parse(local) : [];
+
   try {
     const res = await fetch("/api/propuestas");
     if (res.ok) {
       const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        cachedProposals = data.data;
+      if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+        const map = new Map();
+        [...cachedProposals, ...data.data].forEach(item => map.set(item.id, item));
+        cachedProposals = Array.from(map.values());
         localStorage.setItem("vg2030_proposals", JSON.stringify(cachedProposals));
-        return cachedProposals;
       }
     }
   } catch (e) {
-    console.warn("API offline o local, usando cache local", e);
+    console.warn("API offline, usando almacenamiento local", e);
   }
-  const local = localStorage.getItem("vg2030_proposals");
-  cachedProposals = local ? JSON.parse(local) : [];
+
   return cachedProposals;
 }
 

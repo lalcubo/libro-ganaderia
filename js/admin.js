@@ -1,4 +1,4 @@
-﻿/**
+/**
  * PORTAL VENEZUELA GANADERA 2030 - Panel de Administración con Vercel Postgres
  */
 
@@ -44,26 +44,42 @@ async function apiChangePassword(currentPassword, newPassword) {
 }
 
 async function fetchAllAdminData() {
+  // Cargar siempre primero los datos locales
+  const lAdh = localStorage.getItem("vg2030_adhesions");
+  const lProp = localStorage.getItem("vg2030_proposals");
+  cachedAdminAdhesions = lAdh ? JSON.parse(lAdh) : [];
+  cachedAdminProposals = lProp ? JSON.parse(lProp) : [];
+
   try {
-    const [resAdh, resProp] = await Promise.all([
+    const [resAdh, resProp] = await Promise.allSettled([
       fetch("/api/adhesiones"),
       fetch("/api/propuestas")
     ]);
-    if (resAdh.ok) {
-      const dataAdh = await resAdh.json();
-      if (dataAdh.success && Array.isArray(dataAdh.data)) cachedAdminAdhesions = dataAdh.data;
+
+    if (resAdh.status === "fulfilled" && resAdh.value.ok) {
+      const dataAdh = await resAdh.value.json();
+      if (dataAdh.success && Array.isArray(dataAdh.data) && dataAdh.data.length > 0) {
+        // Unir datos de API con locales sin duplicar
+        const map = new Map();
+        [...cachedAdminAdhesions, ...dataAdh.data].forEach(item => map.set(item.id, item));
+        cachedAdminAdhesions = Array.from(map.values());
+        localStorage.setItem("vg2030_adhesions", JSON.stringify(cachedAdminAdhesions));
+      }
     }
-    if (resProp.ok) {
-      const dataProp = await resProp.json();
-      if (dataProp.success && Array.isArray(dataProp.data)) cachedAdminProposals = dataProp.data;
+
+    if (resProp.status === "fulfilled" && resProp.value.ok) {
+      const dataProp = await resProp.value.json();
+      if (dataProp.success && Array.isArray(dataProp.data) && dataProp.data.length > 0) {
+        const map = new Map();
+        [...cachedAdminProposals, ...dataProp.data].forEach(item => map.set(item.id, item));
+        cachedAdminProposals = Array.from(map.values());
+        localStorage.setItem("vg2030_proposals", JSON.stringify(cachedAdminProposals));
+      }
     }
   } catch (e) {
-    console.warn("API offline, cargando datos locales", e);
-    const lAdh = localStorage.getItem("vg2030_adhesions");
-    const lProp = localStorage.getItem("vg2030_proposals");
-    cachedAdminAdhesions = lAdh ? JSON.parse(lAdh) : [];
-    cachedAdminProposals = lProp ? JSON.parse(lProp) : [];
+    console.warn("API de base de datos no disponible, utilizando almacenamiento local seguro", e);
   }
+
   return { adhesions: cachedAdminAdhesions, proposals: cachedAdminProposals };
 }
 
