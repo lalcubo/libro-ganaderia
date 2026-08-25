@@ -223,6 +223,9 @@
         <button class="modal-close-btn" data-close="modal-adhesion"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <form id="form-adhesion" class="modal-form">
+        <!-- Campo Honeypot Oculto Anti-Bots -->
+        <input type="text" name="hp_website" id="adh-hp-website" tabindex="-1" autocomplete="off" style="display:none !important; visibility:hidden; opacity:0; position:absolute; left:-9999px;">
+
         <div class="form-row">
           <div class="form-group-cedula-wrapper">
             <div class="form-group" style="width: 75px;">
@@ -241,18 +244,18 @@
           </div>
           <div class="form-group">
             <label for="adh-nombre">Nombres y Apellidos <span class="req">*</span></label>
-            <input type="text" id="adh-nombre" class="form-control input-uppercase" placeholder="EJ. JUAN PÉREZ" required>
+            <input type="text" id="adh-nombre" class="form-control input-uppercase" placeholder="EJ. JUAN PÉREZ" maxlength="100" required>
           </div>
         </div>
 
         <div class="form-row">
           <div class="form-group">
             <label for="adh-telefono">Teléfono / WhatsApp <span class="opt">(Opcional)</span></label>
-            <input type="tel" id="adh-telefono" class="form-control" placeholder="Ej. 0414-1234567">
+            <input type="tel" id="adh-telefono" class="form-control" placeholder="Ej. 0414-1234567" maxlength="30">
           </div>
           <div class="form-group">
             <label for="adh-correo">Correo Electrónico <span class="opt">(Opcional)</span></label>
-            <input type="email" id="adh-correo" class="form-control" placeholder="Ej. correo@ejemplo.com">
+            <input type="email" id="adh-correo" class="form-control" placeholder="Ej. correo@ejemplo.com" maxlength="100">
           </div>
         </div>
 
@@ -304,7 +307,7 @@
 
         <div class="form-group">
           <label for="adh-asociacion">Asociación / Empresa / Finca <span class="opt">(Opcional)</span></label>
-          <input type="text" id="adh-asociacion" class="form-control" placeholder="Ej. ASOGATA / Finca El Roble">
+          <input type="text" id="adh-asociacion" class="form-control" placeholder="Ej. ASOGATA / Finca El Roble" maxlength="120">
         </div>
 
         <button type="submit" class="form-submit-btn">
@@ -322,6 +325,9 @@
         <button class="modal-close-btn" data-close="modal-propuesta"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <form id="form-propuesta" class="modal-form">
+        <!-- Campo Honeypot Oculto Anti-Bots -->
+        <input type="text" name="hp_website" id="prop-hp-website" tabindex="-1" autocomplete="off" style="display:none !important; visibility:hidden; opacity:0; position:absolute; left:-9999px;">
+
         <div class="form-row">
           <div class="form-group-cedula-wrapper">
             <div class="form-group" style="width: 75px;">
@@ -340,18 +346,18 @@
           </div>
           <div class="form-group">
             <label for="prop-nombre">Nombres y Apellidos <span class="req">*</span></label>
-            <input type="text" id="prop-nombre" class="form-control input-uppercase" placeholder="EJ. CARLOS MENDOZA" required>
+            <input type="text" id="prop-nombre" class="form-control input-uppercase" placeholder="EJ. CARLOS MENDOZA" maxlength="100" required>
           </div>
         </div>
 
         <div class="form-row">
           <div class="form-group">
             <label for="prop-telefono">Teléfono / WhatsApp <span class="opt">(Opcional)</span></label>
-            <input type="tel" id="prop-telefono" class="form-control" placeholder="Ej. 0424-9876543">
+            <input type="tel" id="prop-telefono" class="form-control" placeholder="Ej. 0424-9876543" maxlength="30">
           </div>
           <div class="form-group">
             <label for="prop-correo">Correo Electrónico <span class="opt">(Opcional)</span></label>
-            <input type="email" id="prop-correo" class="form-control" placeholder="Ej. carlos@gmail.com">
+            <input type="email" id="prop-correo" class="form-control" placeholder="Ej. carlos@gmail.com" maxlength="100">
           </div>
         </div>
 
@@ -405,12 +411,12 @@
 
         <div class="form-group">
           <label for="prop-titulo">Título de la Propuesta <span class="req">*</span></label>
-          <input type="text" id="prop-titulo" class="form-control" placeholder="Ej. Plan de bancos forrajeros comunitarios" required>
+          <input type="text" id="prop-titulo" class="form-control" placeholder="Ej. Plan de bancos forrajeros comunitarios" maxlength="200" required>
         </div>
 
         <div class="form-group">
           <label for="prop-detalle">Descripción y Planteamiento <span class="req">*</span></label>
-          <textarea id="prop-detalle" rows="4" class="form-control" placeholder="Detalla tu propuesta, problema que resuelve y beneficios para el sector ganadero..." required></textarea>
+          <textarea id="prop-detalle" rows="4" class="form-control" placeholder="Detalla tu propuesta, problema que resuelve y beneficios para el sector ganadero..." maxlength="3000" required></textarea>
         </div>
 
         <button type="submit" class="form-submit-btn">

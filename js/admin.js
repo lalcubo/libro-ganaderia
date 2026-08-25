@@ -10,6 +10,17 @@ let propuestasCurrentPage = 1;
 const ADMIN_ITEMS_PER_PAGE = 8;
 let currentViewingPropId = null;
 
+// Helper de sanitización contra ataques XSS
+function escapeHTML(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 // Funciones para comunicarse con la API de Vercel Postgres
 async function apiLogin(username, password) {
   try {
@@ -85,7 +96,7 @@ async function fetchAllAdminData() {
 
 async function deleteAdhesionFromAPI(id) {
   try {
-    await fetch(`/api/adhesiones?id=${id}`, { method: "DELETE" });
+    await fetch(`/api/adhesiones?id=${encodeURIComponent(id)}`, { method: "DELETE" });
   } catch (e) {
     console.warn("Error en DELETE de API, borrando local", e);
   }
@@ -95,7 +106,7 @@ async function deleteAdhesionFromAPI(id) {
 
 async function deleteProposalFromAPI(id) {
   try {
-    await fetch(`/api/propuestas?id=${id}`, { method: "DELETE" });
+    await fetch(`/api/propuestas?id=${encodeURIComponent(id)}`, { method: "DELETE" });
   } catch (e) {
     console.warn("Error en DELETE de API, borrando local", e);
   }
@@ -240,16 +251,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     tbody.innerHTML = pageItems.map((a, i) => `
       <tr>
-        <td style="color:var(--gold); font-weight:700;">${start + i + 1}</td>
-        <td><strong>${a.cedula}</strong></td>
-        <td>${a.nombre}</td>
-        <td>${a.telefono}</td>
-        <td>${a.correo}</td>
-        <td><span style="color:var(--gold); font-weight:600;">${a.estado}</span></td>
-        <td>${a.sector} <br><small style="color:var(--text-muted);">${a.asociacion || ''}</small></td>
-        <td style="white-space:nowrap; font-size:0.8rem; color:var(--text-muted);">${a.fecha}</td>
+        <td style="color:var(--gold-dark, #b45309); font-weight:700;">${start + i + 1}</td>
+        <td><strong>${escapeHTML(a.cedula)}</strong></td>
+        <td>${escapeHTML(a.nombre)}</td>
+        <td>${escapeHTML(a.telefono)}</td>
+        <td>${escapeHTML(a.correo)}</td>
+        <td><span class="badge-estado">${escapeHTML(a.estado)}</span></td>
+        <td>${escapeHTML(a.sector)} <br><small style="color:var(--text-muted);">${escapeHTML(a.asociacion || '')}</small></td>
+        <td style="white-space:nowrap; font-size:0.8rem; color:var(--text-muted);">${escapeHTML(a.fecha)}</td>
         <td>
-          <button class="nav-btn nav-btn-outline" style="padding:4px 8px; font-size:0.75rem; color:#ff5252; border-color:rgba(255,82,82,0.4);" onclick="window.eliminarAdherido('${a.id}')" title="Eliminar registro">
+          <button class="nav-btn nav-btn-outline" style="padding:4px 8px; font-size:0.75rem; color:#dc2626; border-color:rgba(220,38,38,0.4);" onclick="window.eliminarAdherido('${escapeHTML(a.id)}')" title="Eliminar registro">
             <i class="fa-solid fa-trash"></i>
           </button>
         </td>
@@ -271,11 +282,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const filtered = cachedAdminProposals.filter(p => {
       const matchQ = !q || 
-        p.cedula.toLowerCase().includes(q) || 
-        p.nombre.toLowerCase().includes(q) || 
-        p.titulo.toLowerCase().includes(q) || 
-        p.estado.toLowerCase().includes(q) ||
-        p.detalle.toLowerCase().includes(q);
+        (p.cedula && p.cedula.toLowerCase().includes(q)) || 
+        (p.nombre && p.nombre.toLowerCase().includes(q)) || 
+        (p.titulo && p.titulo.toLowerCase().includes(q)) || 
+        (p.estado && p.estado.toLowerCase().includes(q)) ||
+        (p.detalle && p.detalle.toLowerCase().includes(q));
       const matchM = macroFilter === "all" || p.macroeje === macroFilter;
       return matchQ && matchM;
     });
@@ -293,18 +304,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     tbody.innerHTML = pageItems.map((p, i) => `
       <tr>
-        <td style="color:var(--gold); font-weight:700;">${start + i + 1}</td>
-        <td><strong>${p.cedula}</strong></td>
-        <td>${p.nombre}</td>
-        <td><span style="color:var(--gold); font-weight:600;">${p.estado}</span></td>
-        <td><span class="badge-macroeje">${p.macroeje}</span></td>
-        <td style="font-weight:600;">${p.titulo}</td>
-        <td style="white-space:nowrap; font-size:0.8rem; color:var(--text-muted);">${p.fecha}</td>
+        <td style="color:var(--gold-dark, #b45309); font-weight:700;">${start + i + 1}</td>
+        <td><strong>${escapeHTML(p.cedula)}</strong></td>
+        <td>${escapeHTML(p.nombre)}</td>
+        <td><span class="badge-estado">${escapeHTML(p.estado)}</span></td>
+        <td><span class="badge-macroeje">${escapeHTML(p.macroeje)}</span></td>
+        <td style="font-weight:600;">${escapeHTML(p.titulo)}</td>
+        <td style="white-space:nowrap; font-size:0.8rem; color:var(--text-muted);">${escapeHTML(p.fecha)}</td>
         <td style="white-space:nowrap;">
-          <button class="nav-btn nav-btn-outline" style="padding:4px 8px; font-size:0.75rem; margin-right:4px;" onclick="window.verDetallePropuesta('${p.id}')">
+          <button class="nav-btn nav-btn-outline" style="padding:4px 8px; font-size:0.75rem; margin-right:4px;" onclick="window.verDetallePropuesta('${escapeHTML(p.id)}')">
             <i class="fa-solid fa-eye"></i> Leer
           </button>
-          <button class="nav-btn nav-btn-outline" style="padding:4px 8px; font-size:0.75rem; color:#ff5252; border-color:rgba(255,82,82,0.4);" onclick="window.eliminarPropuesta('${p.id}')" title="Eliminar propuesta">
+          <button class="nav-btn nav-btn-outline" style="padding:4px 8px; font-size:0.75rem; color:#dc2626; border-color:rgba(220,38,38,0.4);" onclick="window.eliminarPropuesta('${escapeHTML(p.id)}')" title="Eliminar propuesta">
             <i class="fa-solid fa-trash"></i>
           </button>
         </td>
@@ -367,14 +378,14 @@ document.addEventListener("DOMContentLoaded", () => {
       const confirmP = document.getElementById("cp-confirm").value.trim();
 
       if (newP !== confirmP) {
-        cpMsg.style.color = "#ff5252";
+        cpMsg.style.color = "#dc2626";
         cpMsg.textContent = "Las nuevas contraseñas no coinciden.";
         cpMsg.style.display = "block";
         return;
       }
 
       if (newP.length < 6) {
-        cpMsg.style.color = "#ff5252";
+        cpMsg.style.color = "#dc2626";
         cpMsg.textContent = "La nueva contraseña debe tener al menos 6 caracteres.";
         cpMsg.style.display = "block";
         return;
@@ -382,12 +393,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const res = await apiChangePassword(current, newP);
       if (res.success) {
-        cpMsg.style.color = "#4caf50";
+        cpMsg.style.color = "#16a34a";
         cpMsg.textContent = "¡Contraseña actualizada exitosamente!";
         cpMsg.style.display = "block";
         setTimeout(() => modalChangePass.classList.remove("open"), 1500);
       } else {
-        cpMsg.style.color = "#ff5252";
+        cpMsg.style.color = "#dc2626";
         cpMsg.textContent = res.error || "No se pudo actualizar la contraseña.";
         cpMsg.style.display = "block";
       }
@@ -432,17 +443,17 @@ document.addEventListener("DOMContentLoaded", () => {
     currentViewingPropId = id;
 
     document.getElementById("modal-prop-tags").innerHTML = `
-      <span class="badge-macroeje">${p.macroeje}</span>
-      <span style="font-size:0.78rem; color:var(--text-muted); padding:4px 8px;">Fecha: ${p.fecha}</span>
+      <span class="badge-macroeje">${escapeHTML(p.macroeje)}</span>
+      <span style="font-size:0.78rem; color:var(--text-muted); padding:4px 8px;">Fecha: ${escapeHTML(p.fecha)}</span>
     `;
     document.getElementById("modal-prop-titulo").textContent = p.titulo;
     document.getElementById("modal-prop-detalle").textContent = p.detalle;
     document.getElementById("modal-prop-autor-info").innerHTML = `
-      <div><strong>Proponente:</strong> ${p.nombre}</div>
-      <div><strong>Cédula:</strong> ${p.cedula}</div>
-      <div><strong>Estado:</strong> ${p.estado}</div>
-      <div><strong>Teléfono:</strong> ${p.telefono}</div>
-      <div><strong>Correo:</strong> ${p.correo}</div>
+      <div><strong>Proponente:</strong> ${escapeHTML(p.nombre)}</div>
+      <div><strong>Cédula:</strong> ${escapeHTML(p.cedula)}</div>
+      <div><strong>Estado:</strong> ${escapeHTML(p.estado)}</div>
+      <div><strong>Teléfono:</strong> ${escapeHTML(p.telefono)}</div>
+      <div><strong>Correo:</strong> ${escapeHTML(p.correo)}</div>
     `;
 
     modalVerPropuesta.classList.add("open");

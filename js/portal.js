@@ -75,6 +75,17 @@ async function submitAdhesionToAPI(item) {
   return { success: true };
 }
 
+// Función para prevención de ataques XSS (Cross-Site Scripting)
+function escapeHTML(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   // 1. Forzar que las Cédulas SOLO acepten números en tiempo real
   document.querySelectorAll(".input-cedula-onlynum").forEach(input => {
@@ -135,6 +146,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     formAdhesion.addEventListener("submit", async (e) => {
       e.preventDefault();
 
+      // Detección de Bot Honeypot
+      const hp = document.getElementById("adh-hp-website")?.value || "";
+      if (hp.trim() !== "") {
+        console.warn("Bot detected");
+        formAdhesion.reset();
+        closeModal(modalAdhesion);
+        return;
+      }
+
       const nac = document.getElementById("adh-nacionalidad").value;
       const cedulaNum = document.getElementById("adh-cedula-num").value.trim();
       const nombre = document.getElementById("adh-nombre").value.trim().toUpperCase();
@@ -165,7 +185,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         estado,
         sector,
         asociacion: asociacion || "PARTICULAR",
-        fecha: new Date().toISOString().split("T")[0]
+        fecha: new Date().toISOString().split("T")[0],
+        hp_website: hp
       };
 
       const result = await submitAdhesionToAPI(newAdhesion);
@@ -181,7 +202,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       formAdhesion.reset();
       closeModal(modalAdhesion);
 
-      graciasMensaje.innerHTML = `Estimado(a) <strong>${nombre}</strong> (C.I. ${cedulaCompleta}):<br><br>Su adhesión a la iniciativa nacional <strong>Venezuela Ganadera 2030</strong> ha sido registrada con éxito en la base de datos. ¡Gracias por sumar al futuro del campo venezolano!`;
+      graciasMensaje.innerHTML = `Estimado(a) <strong>${escapeHTML(nombre)}</strong> (C.I. ${escapeHTML(cedulaCompleta)}):<br><br>Su adhesión a la iniciativa nacional <strong>Venezuela Ganadera 2030</strong> ha sido registrada con éxito en la base de datos. ¡Gracias por sumar al futuro del campo venezolano!`;
       openModal(modalGracias);
     });
   }
@@ -191,6 +212,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (formPropuesta) {
     formPropuesta.addEventListener("submit", async (e) => {
       e.preventDefault();
+
+      // Detección de Bot Honeypot
+      const hp = document.getElementById("prop-hp-website")?.value || "";
+      if (hp.trim() !== "") {
+        console.warn("Bot detected");
+        formPropuesta.reset();
+        closeModal(modalPropuesta);
+        return;
+      }
 
       const nac = document.getElementById("prop-nacionalidad").value;
       const cedulaNum = document.getElementById("prop-cedula-num").value.trim();
@@ -224,7 +254,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         macroeje,
         titulo,
         detalle,
-        fecha: new Date().toISOString().split("T")[0]
+        fecha: new Date().toISOString().split("T")[0],
+        hp_website: hp
       };
 
       await submitProposalToAPI(newProposal);
@@ -237,7 +268,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       renderPublicProposals();
 
-      graciasMensaje.innerHTML = `Estimado(a) <strong>${nombre}</strong>:<br><br>Su propuesta <em>"${titulo}"</em> ha sido registrada exitosamente en la base de datos para el macroeje <strong>${macroeje}</strong>. ¡Gracias por su valioso aporte al Master Plan!`;
+      graciasMensaje.innerHTML = `Estimado(a) <strong>${escapeHTML(nombre)}</strong>:<br><br>Su propuesta <em>"${escapeHTML(titulo)}"</em> ha sido registrada exitosamente en la base de datos para el macroeje <strong>${escapeHTML(macroeje)}</strong>. ¡Gracias por su valioso aporte al Master Plan!`;
       openModal(modalGracias);
     });
   }
@@ -259,10 +290,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const filtered = cachedProposals.filter(p => {
       const matchQuery = !query || 
-        p.titulo.toLowerCase().includes(query) || 
-        p.detalle.toLowerCase().includes(query) || 
-        p.estado.toLowerCase().includes(query) || 
-        p.nombre.toLowerCase().includes(query);
+        (p.titulo && p.titulo.toLowerCase().includes(query)) || 
+        (p.detalle && p.detalle.toLowerCase().includes(query)) || 
+        (p.estado && p.estado.toLowerCase().includes(query)) || 
+        (p.nombre && p.nombre.toLowerCase().includes(query));
       const matchFilter = filter === "all" || p.macroeje === filter;
       return matchQuery && matchFilter;
     });
@@ -287,14 +318,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     grid.innerHTML = pageItems.map(p => `
       <div class="proposal-card">
         <div class="proposal-meta">
-          <span class="badge-macroeje">${p.macroeje}</span>
-          <span class="proposal-date">${p.fecha}</span>
+          <span class="badge-macroeje">${escapeHTML(p.macroeje)}</span>
+          <span class="proposal-date">${escapeHTML(p.fecha)}</span>
         </div>
-        <h3 class="proposal-title">${p.titulo}</h3>
-        <p class="proposal-desc">${p.detalle}</p>
+        <h3 class="proposal-title">${escapeHTML(p.titulo)}</h3>
+        <p class="proposal-desc">${escapeHTML(p.detalle)}</p>
         <div class="proposal-author">
-          <span class="author-name"><i class="fa-solid fa-user" style="color:var(--gold); margin-right:4px;"></i> ${p.nombre}</span>
-          <span class="author-state"><i class="fa-solid fa-location-dot" style="margin-right:4px;"></i> ${p.estado}</span>
+          <span class="author-name"><i class="fa-solid fa-user" style="color:var(--gold); margin-right:4px;"></i> ${escapeHTML(p.nombre)}</span>
+          <span class="author-state"><i class="fa-solid fa-location-dot" style="margin-right:4px;"></i> ${escapeHTML(p.estado)}</span>
         </div>
       </div>
     `).join("");

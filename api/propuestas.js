@@ -1,6 +1,15 @@
-﻿import { sql } from "@vercel/postgres";
+import { sql } from "@vercel/postgres";
 
 let memoryProposals = [];
+
+// Helper de sanitización y prevención de ataques (XSS / Inyecciones)
+function cleanString(str, maxLength = 255) {
+  if (typeof str !== "string") return "";
+  return str
+    .replace(/<[^>]*>?/gm, "") // Eliminar etiquetas HTML/scripts
+    .trim()
+    .slice(0, maxLength);
+}
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -31,7 +40,7 @@ export default async function handler(req, res) {
       `;
     }
 
-    // GET
+    // GET: Listar propuestas
     if (req.method === "GET") {
       if (hasPostgres) {
         const { rows } = await sql`SELECT * FROM propuestas ORDER BY fecha DESC, id DESC;`;
@@ -41,49 +50,77 @@ export default async function handler(req, res) {
       }
     }
 
-    // POST
+    // POST: Registrar propuesta con validaciones de seguridad
     if (req.method === "POST") {
-      const { id, cedula, nombre, telefono, correo, estado, macroeje, titulo, detalle, fecha } = req.body;
+      const { id, cedula, nombre, telefono, correo, estado, macroeje, titulo, detalle, fecha, hp_website } = req.body;
 
-      if (!cedula || !nombre || !titulo || !detalle) {
-        return res.status(400).json({ success: false, error: "Campos obligatorios requeridos" });
+      // 1. Trampa Honeypot contra Bots automatizados
+      if (hp_website && hp_website.trim() !== "") {
+        // Silenciosamente responder 200 sin registrar nada
+        return res.status(200).json({ success: true, message: "OK" });
       }
 
-      const recId = id || ("prop-" + Date.now());
-      const recFecha = fecha || new Date().toISOString().split("T")[0];
+      // 2. Sanitización y limpieza de campos
+      const cleanCedula = cleanString(cedula, 25).toUpperCase();
+      const cleanNombre = cleanString(nombre, 100).toUpperCase();
+      const cleanTelefono = cleanString(telefono, 35);
+      const cleanCorreo = cleanString(correo, 100).toLowerCase();
+      const cleanEstado = cleanString(estado, 50);
+      const cleanMacroeje = cleanString(macroeje, 100);
+      const cleanTitulo = cleanString(titulo, 250);
+      const cleanDetalle = cleanString(detalle, 3500);
+      const cleanFecha = cleanString(fecha, 20) || new Date().toISOString().split("T")[0];
+      const recId = cleanString(id, 64) || ("prop-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7));
+
+      // 3. Validación de campos obligatorios
+      if (!cleanCedula || !cleanNombre || !cleanTitulo || !cleanDetalle) {
+        return res.status(400).json({ success: false, error: "Campos obligatorios requeridos (*)" });
+      }
 
       if (hasPostgres) {
         await sql`
           INSERT INTO propuestas (id, cedula, nombre, telefono, correo, estado, macroeje, titulo, detalle, fecha)
-          VALUES (${recId}, ${cedula}, ${nombre}, ${telefono || "No especificado"}, ${correo || "No especificado"}, ${estado || "No especificado"}, ${macroeje || "General"}, ${titulo}, ${detalle}, ${recFecha});
+          VALUES (
+            ${recId}, 
+            ${cleanCedula}, 
+            ${cleanNombre}, 
+            ${cleanTelefono || "No especificado"}, 
+            ${cleanCorreo || "No especificado"}, 
+            ${cleanEstado || "No especificado"}, 
+            ${cleanMacroeje || "General"}, 
+            ${cleanTitulo}, 
+            ${cleanDetalle}, 
+            ${cleanFecha}
+          );
         `;
       } else {
         memoryProposals.unshift({
           id: recId,
-          cedula,
-          nombre,
-          telefono: telefono || "No especificado",
-          correo: correo || "No especificado",
-          estado: estado || "No especificado",
-          macroeje: macroeje || "General",
-          titulo,
-          detalle,
-          fecha: recFecha
+          cedula: cleanCedula,
+          nombre: cleanNombre,
+          telefono: cleanTelefono || "No especificado",
+          correo: cleanCorreo || "No especificado",
+          estado: cleanEstado || "No especificado",
+          macroeje: cleanMacroeje || "General",
+          titulo: cleanTitulo,
+          detalle: cleanDetalle,
+          fecha: cleanFecha
         });
       }
 
       return res.status(201).json({ success: true, message: "Propuesta registrada con éxito", id: recId });
     }
 
-    // DELETE
+    // DELETE: Eliminar propuesta
     if (req.method === "DELETE") {
       const { id } = req.query;
-      if (!id) return res.status(400).json({ success: false, error: "ID requerido" });
+      const cleanId = cleanString(id, 64);
+      if (!cleanId) return res.status(400).json({ success: false, error: "ID requerido" });
 
       if (hasPostgres) {
-        await sql`DELETE FROM propuestas WHERE id = ${id};`;
+        await sql`DELETE FROM propuestas WHERE id = ${cleanId};`;
       } else {
-        memoryProposals = memoryProposals.filter(p => p.id !== id);
+        memoryProposals = memoryProposals.filter(p => p.id !== cleanId);
       }
       return res.status(200).json({ success: true, message: "Propuesta eliminada con éxito" });
     }
@@ -91,6 +128,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ success: false, error: "Método no permitido" });
   } catch (error) {
     console.error("Error en /api/propuestas:", error);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({ success: false, error: "Error interno del servidor" });
   }
 }

@@ -21,10 +21,10 @@
   <!-- Estilos -->
   <link rel="stylesheet" href="css/portal.css?v=2.2">
 </head>
-<body>
+<body class="admin-body-light">
 
   <!-- Barra de Navegación del Admin -->
-  <header class="portal-nav">
+  <header class="portal-nav admin-nav-light">
     <div class="container portal-nav-content">
       <a href="index.html" class="nav-brand">
         <i class="fa-solid fa-shield-halved nav-brand-icon"></i>
@@ -50,9 +50,9 @@
   <!-- Vista 1: Login de Acceso -->
   <div id="admin-login-view" class="container">
     <div class="login-card">
-      <div class="login-icon"><i class="fa-solid fa-lock"></i></div>
-      <h2 style="font-family: 'Cinzel', serif; font-size: 1.3rem; margin-bottom: 8px; color: var(--gold);">Acceso Administrativo</h2>
-      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 24px;">Ingresa tus credenciales para gestionar adheridos y propuestas.</p>
+      <div class="login-icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <h2 class="login-heading">Acceso Administrativo</h2>
+      <p class="login-subtext">Ingresa tus credenciales para gestionar adheridos y propuestas.</p>
       
       <form id="form-admin-login" style="display: flex; flex-direction: column; gap: 14px; text-align: left;">
         <div class="form-group">
@@ -63,7 +63,7 @@
           <label for="admin-pass">Contraseña</label>
           <input type="password" id="admin-pass" class="form-control" placeholder="••••••••" required autocomplete="current-password">
         </div>
-        <div id="login-error-msg" style="color: #ff5252; font-size: 0.82rem; display: none;">Usuario o contraseña incorrectos.</div>
+        <div id="login-error-msg" class="login-error-alert" style="display: none;">Usuario o contraseña incorrectos.</div>
         <button type="submit" class="form-submit-btn" style="margin-top: 10px;">
           <i class="fa-solid fa-arrow-right-to-bracket"></i> Iniciar Sesión
         </button>
@@ -216,14 +216,14 @@
       </div>
       <div style="padding: 24px;">
         <div style="display: flex; gap: 8px; margin-bottom: 12px;" id="modal-prop-tags"></div>
-        <h2 id="modal-prop-titulo" style="font-size: 1.25rem; margin-bottom: 14px; color: #ffffff;"></h2>
-        <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); margin-bottom: 16px;">
-          <p id="modal-prop-detalle" style="white-space: pre-line; line-height: 1.7; color: var(--text-main); font-size: 0.95rem;"></p>
+        <h2 id="modal-prop-titulo" class="modal-prop-title-light"></h2>
+        <div class="modal-prop-detail-box">
+          <p id="modal-prop-detalle" style="white-space: pre-line; line-height: 1.7; font-size: 0.95rem;"></p>
         </div>
-        <div style="font-size: 0.85rem; color: var(--text-muted); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px;" id="modal-prop-autor-info"></div>
+        <div class="modal-prop-author-box" id="modal-prop-autor-info"></div>
         
         <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <button id="btn-modal-delete-prop" class="nav-btn nav-btn-outline" style="color: #ff5252; border-color: rgba(255,82,82,0.4);">
+          <button id="btn-modal-delete-prop" class="nav-btn nav-btn-outline" style="color: #dc2626; border-color: rgba(220,38,38,0.4);">
             <i class="fa-solid fa-trash"></i> Eliminar Propuesta
           </button>
         </div>
@@ -260,6 +260,6 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/admin.js?v=2.2"></script>
+  <script src="js/admin.js?v=2.3"></script>
 </body>
 </html>
