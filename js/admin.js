@@ -1,24 +1,91 @@
 ﻿/**
- * PORTAL VENEZUELA GANADERA 2030 - Panel de Administración
- * Incluye gestión de registros, eliminación de adheridos y propuestas, y cambio de clave
+ * PORTAL VENEZUELA GANADERA 2030 - Panel de Administración con Vercel Postgres
  */
 
-const DEFAULT_ADMIN_USER = "admin";
-const DEFAULT_ADMIN_PASS = "ganaderia2030";
+let cachedAdminAdhesions = [];
+let cachedAdminProposals = [];
 
-function getAdminPass() {
-  return localStorage.getItem("vg2030_admin_password") || DEFAULT_ADMIN_PASS;
-}
-
-function setAdminPass(newPass) {
-  localStorage.setItem("vg2030_admin_password", newPass);
-}
-
-// Estado de paginación
 let adheridosCurrentPage = 1;
 let propuestasCurrentPage = 1;
 const ADMIN_ITEMS_PER_PAGE = 8;
 let currentViewingPropId = null;
+
+// Funciones para comunicarse con la API de Vercel Postgres
+async function apiLogin(username, password) {
+  try {
+    const res = await fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "login", username, password })
+    });
+    const data = await res.json();
+    return data.success;
+  } catch (e) {
+    console.warn("API de Auth no disponible, usando fallback local", e);
+    return username === "admin" && (password === (localStorage.getItem("vg2030_admin_password") || "ganaderia2030"));
+  }
+}
+
+async function apiChangePassword(currentPassword, newPassword) {
+  try {
+    const res = await fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "change_password", currentPassword, newPassword })
+    });
+    return await res.json();
+  } catch (e) {
+    console.warn("API de Auth no disponible, usando fallback local", e);
+    const saved = localStorage.getItem("vg2030_admin_password") || "ganaderia2030";
+    if (currentPassword !== saved) return { success: false, error: "La contraseña actual no es correcta" };
+    localStorage.setItem("vg2030_admin_password", newPassword);
+    return { success: true };
+  }
+}
+
+async function fetchAllAdminData() {
+  try {
+    const [resAdh, resProp] = await Promise.all([
+      fetch("/api/adhesiones"),
+      fetch("/api/propuestas")
+    ]);
+    if (resAdh.ok) {
+      const dataAdh = await resAdh.json();
+      if (dataAdh.success && Array.isArray(dataAdh.data)) cachedAdminAdhesions = dataAdh.data;
+    }
+    if (resProp.ok) {
+      const dataProp = await resProp.json();
+      if (dataProp.success && Array.isArray(dataProp.data)) cachedAdminProposals = dataProp.data;
+    }
+  } catch (e) {
+    console.warn("API offline, cargando datos locales", e);
+    const lAdh = localStorage.getItem("vg2030_adhesions");
+    const lProp = localStorage.getItem("vg2030_proposals");
+    cachedAdminAdhesions = lAdh ? JSON.parse(lAdh) : [];
+    cachedAdminProposals = lProp ? JSON.parse(lProp) : [];
+  }
+  return { adhesions: cachedAdminAdhesions, proposals: cachedAdminProposals };
+}
+
+async function deleteAdhesionFromAPI(id) {
+  try {
+    await fetch(`/api/adhesiones?id=${id}`, { method: "DELETE" });
+  } catch (e) {
+    console.warn("Error en DELETE de API, borrando local", e);
+  }
+  cachedAdminAdhesions = cachedAdminAdhesions.filter(a => a.id !== id);
+  localStorage.setItem("vg2030_adhesions", JSON.stringify(cachedAdminAdhesions));
+}
+
+async function deleteProposalFromAPI(id) {
+  try {
+    await fetch(`/api/propuestas?id=${id}`, { method: "DELETE" });
+  } catch (e) {
+    console.warn("Error en DELETE de API, borrando local", e);
+  }
+  cachedAdminProposals = cachedAdminProposals.filter(p => p.id !== id);
+  localStorage.setItem("vg2030_proposals", JSON.stringify(cachedAdminProposals));
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   const loginView = document.getElementById("admin-login-view");
@@ -28,43 +95,48 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnLogout = document.getElementById("btn-logout");
   const btnOpenChangePass = document.getElementById("btn-open-change-pass");
 
-  // Pestañas
   const tabBtnAdheridos = document.getElementById("tab-btn-adheridos");
   const tabBtnPropuestas = document.getElementById("tab-btn-propuestas");
   const tabAdheridos = document.getElementById("tab-adheridos");
   const tabPropuestas = document.getElementById("tab-propuestas");
 
-  // Búsqueda y Filtros
   const searchAdheridos = document.getElementById("admin-search-adheridos");
   const searchPropuestas = document.getElementById("admin-search-propuestas");
   const filterMacroeje = document.getElementById("admin-filter-macroeje");
 
-  // Botones de Exportar
   const btnExportAdhExcel = document.getElementById("btn-export-adheridos-excel");
   const btnExportAdhPdf = document.getElementById("btn-export-adheridos-pdf");
   const btnExportPropExcel = document.getElementById("btn-export-propuestas-excel");
   const btnExportPropPdf = document.getElementById("btn-export-propuestas-pdf");
 
-  // Modales
   const modalVerPropuesta = document.getElementById("modal-ver-propuesta");
   const modalChangePass = document.getElementById("modal-change-pass");
   const formChangePass = document.getElementById("form-change-pass");
   const cpMsg = document.getElementById("cp-msg");
   const btnModalDeleteProp = document.getElementById("btn-modal-delete-prop");
 
-  // Verificar sesión activa
   if (sessionStorage.getItem("vg2030_admin_auth") === "true") {
     showDashboard();
   }
 
   // 1. Login
   if (formLogin) {
-    formLogin.addEventListener("submit", (e) => {
+    formLogin.addEventListener("submit", async (e) => {
       e.preventDefault();
       const u = document.getElementById("admin-user").value.trim();
       const p = document.getElementById("admin-pass").value.trim();
 
-      if (u === DEFAULT_ADMIN_USER && p === getAdminPass()) {
+      const btn = formLogin.querySelector(".form-submit-btn");
+      const origText = btn.innerHTML;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Verificando...`;
+      btn.disabled = true;
+
+      const success = await apiLogin(u, p);
+
+      btn.innerHTML = origText;
+      btn.disabled = false;
+
+      if (success) {
         sessionStorage.setItem("vg2030_admin_auth", "true");
         loginErrorMsg.style.display = "none";
         showDashboard();
@@ -85,15 +157,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function showDashboard() {
+  async function showDashboard() {
     loginView.style.display = "none";
     dashboardView.style.display = "block";
     btnLogout.style.display = "inline-flex";
     if (btnOpenChangePass) btnOpenChangePass.style.display = "inline-flex";
-    refreshDashboard();
+    await refreshDashboard();
   }
 
-  // 3. Conmutador de Pestañas
+  // 3. Pestañas
   if (tabBtnAdheridos && tabBtnPropuestas) {
     tabBtnAdheridos.addEventListener("click", () => {
       tabBtnAdheridos.classList.add("active");
@@ -110,50 +182,28 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Datos
-  function getAdhesionsData() {
-    const raw = localStorage.getItem("vg2030_adhesions");
-    return raw ? JSON.parse(raw) : [];
-  }
+  async function refreshDashboard() {
+    await fetchAllAdminData();
 
-  function saveAdhesionsData(list) {
-    localStorage.setItem("vg2030_adhesions", JSON.stringify(list));
-  }
+    document.getElementById("stat-total-adheridos").textContent = cachedAdminAdhesions.length;
+    document.getElementById("stat-total-propuestas").textContent = cachedAdminProposals.length;
+    document.getElementById("badge-count-adheridos").textContent = cachedAdminAdhesions.length;
+    document.getElementById("badge-count-propuestas").textContent = cachedAdminProposals.length;
 
-  function getProposalsData() {
-    const raw = localStorage.getItem("vg2030_proposals");
-    return raw ? JSON.parse(raw) : [];
-  }
-
-  function saveProposalsData(list) {
-    localStorage.setItem("vg2030_proposals", JSON.stringify(list));
-  }
-
-  // Actualizar Dashboard
-  function refreshDashboard() {
-    const adheridos = getAdhesionsData();
-    const propuestas = getProposalsData();
-
-    document.getElementById("stat-total-adheridos").textContent = adheridos.length;
-    document.getElementById("stat-total-propuestas").textContent = propuestas.length;
-    document.getElementById("badge-count-adheridos").textContent = adheridos.length;
-    document.getElementById("badge-count-propuestas").textContent = propuestas.length;
-
-    const estadosSet = new Set([...adheridos.map(a => a.estado), ...propuestas.map(p => p.estado)]);
+    const estadosSet = new Set([...cachedAdminAdhesions.map(a => a.estado), ...cachedAdminProposals.map(p => p.estado)]);
     document.getElementById("stat-total-estados").textContent = estadosSet.size;
 
     renderAdheridosTable();
     renderPropuestasTable();
   }
 
-  // 4. Render Tabla de Adheridos con Botón de Eliminar
+  // 4. Render Tabla de Adheridos
   function renderAdheridosTable() {
     const tbody = document.getElementById("admin-tbody-adheridos");
     const pagination = document.getElementById("admin-pagination-adheridos");
-    const all = getAdhesionsData();
     const q = searchAdheridos ? searchAdheridos.value.toLowerCase().trim() : "";
 
-    const filtered = all.filter(a => {
+    const filtered = cachedAdminAdhesions.filter(a => {
       return !q || 
         a.cedula.toLowerCase().includes(q) || 
         a.nombre.toLowerCase().includes(q) || 
@@ -162,7 +212,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     if (filtered.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:var(--text-muted);">No hay registros de adhesión que coincidan con la búsqueda.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:35px; color:var(--text-muted);">No hay personas adheridas registradas en la base de datos.</td></tr>`;
       pagination.innerHTML = "";
       return;
     }
@@ -196,15 +246,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 5. Render Tabla de Propuestas con Botón de Eliminar
+  // 5. Render Tabla de Propuestas
   function renderPropuestasTable() {
     const tbody = document.getElementById("admin-tbody-propuestas");
     const pagination = document.getElementById("admin-pagination-propuestas");
-    const all = getProposalsData();
     const q = searchPropuestas ? searchPropuestas.value.toLowerCase().trim() : "";
     const macroFilter = filterMacroeje ? filterMacroeje.value : "all";
 
-    const filtered = all.filter(p => {
+    const filtered = cachedAdminProposals.filter(p => {
       const matchQ = !q || 
         p.cedula.toLowerCase().includes(q) || 
         p.nombre.toLowerCase().includes(q) || 
@@ -216,7 +265,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     if (filtered.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">No hay propuestas registradas con los criterios seleccionados.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:35px; color:var(--text-muted);">No hay propuestas registradas en la base de datos con estos criterios.</td></tr>`;
       pagination.innerHTML = "";
       return;
     }
@@ -253,31 +302,27 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // 6. Eliminar Adherido
-  window.eliminarAdherido = function(id) {
-    const list = getAdhesionsData();
-    const item = list.find(a => a.id === id);
+  window.eliminarAdherido = async function(id) {
+    const item = cachedAdminAdhesions.find(a => a.id === id);
     if (!item) return;
 
-    if (confirm(`¿Estás seguro de eliminar el registro de adhesión de ${item.nombre} (C.I. ${item.cedula})?`)) {
-      const updated = list.filter(a => a.id !== id);
-      saveAdhesionsData(updated);
-      refreshDashboard();
+    if (confirm(`¿Estás seguro de eliminar a ${item.nombre} (C.I. ${item.cedula}) de la base de datos?`)) {
+      await deleteAdhesionFromAPI(id);
+      await refreshDashboard();
     }
   };
 
   // 7. Eliminar Propuesta
-  window.eliminarPropuesta = function(id) {
-    const list = getProposalsData();
-    const item = list.find(p => p.id === id);
+  window.eliminarPropuesta = async function(id) {
+    const item = cachedAdminProposals.find(p => p.id === id);
     if (!item) return;
 
-    if (confirm(`¿Estás seguro de eliminar la propuesta "${item.titulo}" de ${item.nombre}?`)) {
-      const updated = list.filter(p => p.id !== id);
-      saveProposalsData(updated);
+    if (confirm(`¿Estás seguro de eliminar la propuesta "${item.titulo}" de la base de datos?`)) {
+      await deleteProposalFromAPI(id);
       if (modalVerPropuesta.classList.contains("open")) {
         modalVerPropuesta.classList.remove("open");
       }
-      refreshDashboard();
+      await refreshDashboard();
     }
   };
 
@@ -289,7 +334,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 8. Cambiar Contraseña del Admin
+  // 8. Cambiar Contraseña
   if (btnOpenChangePass) {
     btnOpenChangePass.addEventListener("click", () => {
       formChangePass.reset();
@@ -299,18 +344,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (formChangePass) {
-    formChangePass.addEventListener("submit", (e) => {
+    formChangePass.addEventListener("submit", async (e) => {
       e.preventDefault();
       const current = document.getElementById("cp-current").value.trim();
       const newP = document.getElementById("cp-new").value.trim();
       const confirmP = document.getElementById("cp-confirm").value.trim();
-
-      if (current !== getAdminPass()) {
-        cpMsg.style.color = "#ff5252";
-        cpMsg.textContent = "La contraseña actual no es correcta.";
-        cpMsg.style.display = "block";
-        return;
-      }
 
       if (newP !== confirmP) {
         cpMsg.style.color = "#ff5252";
@@ -326,18 +364,20 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      setAdminPass(newP);
-      cpMsg.style.color = "#4caf50";
-      cpMsg.textContent = "¡Contraseña actualizada exitosamente!";
-      cpMsg.style.display = "block";
-
-      setTimeout(() => {
-        modalChangePass.classList.remove("open");
-      }, 1500);
+      const res = await apiChangePassword(current, newP);
+      if (res.success) {
+        cpMsg.style.color = "#4caf50";
+        cpMsg.textContent = "¡Contraseña actualizada exitosamente!";
+        cpMsg.style.display = "block";
+        setTimeout(() => modalChangePass.classList.remove("open"), 1500);
+      } else {
+        cpMsg.style.color = "#ff5252";
+        cpMsg.textContent = res.error || "No se pudo actualizar la contraseña.";
+        cpMsg.style.display = "block";
+      }
     });
   }
 
-  // Paginación genérica
   function renderPaginationControl(container, totalPages, currentPage, onSelect) {
     if (totalPages <= 1) {
       container.innerHTML = "";
@@ -370,10 +410,8 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Ver detalle de propuesta en modal
   window.verDetallePropuesta = function(id) {
-    const propuestas = getProposalsData();
-    const p = propuestas.find(item => item.id === id);
+    const p = cachedAdminProposals.find(item => item.id === id);
     if (!p) return;
     currentViewingPropId = id;
 
@@ -394,12 +432,10 @@ document.addEventListener("DOMContentLoaded", () => {
     modalVerPropuesta.classList.add("open");
   };
 
-  // Eventos de búsqueda
   if (searchAdheridos) searchAdheridos.addEventListener("input", () => { adheridosCurrentPage = 1; renderAdheridosTable(); });
   if (searchPropuestas) searchPropuestas.addEventListener("input", () => { propuestasCurrentPage = 1; renderPropuestasTable(); });
   if (filterMacroeje) filterMacroeje.addEventListener("change", () => { propuestasCurrentPage = 1; renderPropuestasTable(); });
 
-  // Cerrar modales
   document.querySelectorAll(".modal-close-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const targetId = btn.getAttribute("data-close");
@@ -414,47 +450,31 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // =========================================================================
-  // EXPORTADORES A EXCEL (CSV UTF-8) Y PDF
-  // =========================================================================
-
-  // 1. Exportar Adheridos a Excel (CSV con BOM)
+  // Exportadores a Excel (CSV con BOM) y PDF
   if (btnExportAdhExcel) {
     btnExportAdhExcel.addEventListener("click", () => {
-      const data = getAdhesionsData();
       let csv = "\uFEFF";
       csv += "ID,Cedula,Nombre,Telefono,Correo,Estado,Sector,Asociacion,Fecha\n";
-      data.forEach(a => {
+      cachedAdminAdhesions.forEach(a => {
         csv += `"${a.id}","${a.cedula}","${a.nombre}","${a.telefono}","${a.correo}","${a.estado}","${a.sector}","${a.asociacion || ''}","${a.fecha}"\n`;
       });
       downloadFile(csv, "Venezuela-Ganadera-2030-Adheridos.csv", "text/csv;charset=utf-8;");
     });
   }
 
-  // 2. Exportar Adheridos a PDF
   if (btnExportAdhPdf) {
     btnExportAdhPdf.addEventListener("click", () => {
-      const data = getAdhesionsData();
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF("landscape");
-
       doc.setFontSize(16);
       doc.setTextColor(35, 108, 52);
       doc.text("VENEZUELA GANADERA 2030 - REGISTRO DE ADHESIONES", 14, 15);
-      
       doc.setFontSize(10);
       doc.setTextColor(100);
-      doc.text(`Reporte generado el: ${new Date().toLocaleDateString()} | Total registros: ${data.length}`, 14, 22);
+      doc.text(`Reporte generado el: ${new Date().toLocaleDateString()} | Total registros: ${cachedAdminAdhesions.length}`, 14, 22);
 
-      const tableData = data.map((a, i) => [
-        i + 1,
-        a.cedula,
-        a.nombre,
-        a.telefono,
-        a.correo,
-        a.estado,
-        a.sector,
-        a.fecha
+      const tableData = cachedAdminAdhesions.map((a, i) => [
+        i + 1, a.cedula, a.nombre, a.telefono, a.correo, a.estado, a.sector, a.fecha
       ]);
 
       doc.autoTable({
@@ -465,18 +485,15 @@ document.addEventListener("DOMContentLoaded", () => {
         headStyles: { fillColor: [35, 108, 52], textColor: 255, fontStyle: 'bold' },
         styles: { fontSize: 8, cellPadding: 3 }
       });
-
       doc.save("Venezuela-Ganadera-2030-Adheridos.pdf");
     });
   }
 
-  // 3. Exportar Propuestas a Excel (CSV con BOM)
   if (btnExportPropExcel) {
     btnExportPropExcel.addEventListener("click", () => {
-      const data = getProposalsData();
       let csv = "\uFEFF";
       csv += "ID,Cedula,Nombre,Telefono,Correo,Estado,Macroeje,Titulo,Detalle,Fecha\n";
-      data.forEach(p => {
+      cachedAdminProposals.forEach(p => {
         const cleanDetalle = (p.detalle || "").replace(/"/g, '""').replace(/\n/g, ' ');
         csv += `"${p.id}","${p.cedula}","${p.nombre}","${p.telefono}","${p.correo}","${p.estado}","${p.macroeje}","${p.titulo}","${cleanDetalle}","${p.fecha}"\n`;
       });
@@ -484,30 +501,19 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 4. Exportar Propuestas a PDF
   if (btnExportPropPdf) {
     btnExportPropPdf.addEventListener("click", () => {
-      const data = getProposalsData();
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF("landscape");
-
       doc.setFontSize(16);
       doc.setTextColor(35, 108, 52);
       doc.text("VENEZUELA GANADERA 2030 - BANCO DE PROPUESTAS", 14, 15);
-      
       doc.setFontSize(10);
       doc.setTextColor(100);
-      doc.text(`Reporte generado el: ${new Date().toLocaleDateString()} | Total propuestas: ${data.length}`, 14, 22);
+      doc.text(`Reporte generado el: ${new Date().toLocaleDateString()} | Total propuestas: ${cachedAdminProposals.length}`, 14, 22);
 
-      const tableData = data.map((p, i) => [
-        i + 1,
-        p.cedula,
-        p.nombre,
-        p.estado,
-        p.macroeje,
-        p.titulo,
-        p.detalle.substring(0, 80) + '...',
-        p.fecha
+      const tableData = cachedAdminProposals.map((p, i) => [
+        i + 1, p.cedula, p.nombre, p.estado, p.macroeje, p.titulo, (p.detalle || '').substring(0, 80) + '...', p.fecha
       ]);
 
       doc.autoTable({
@@ -517,12 +523,8 @@ document.addEventListener("DOMContentLoaded", () => {
         theme: 'grid',
         headStyles: { fillColor: [212, 175, 55], textColor: [15, 25, 18], fontStyle: 'bold' },
         styles: { fontSize: 8, cellPadding: 3 },
-        columnStyles: {
-          5: { cellWidth: 50 },
-          6: { cellWidth: 70 }
-        }
+        columnStyles: { 5: { cellWidth: 50 }, 6: { cellWidth: 70 } }
       });
-
       doc.save("Venezuela-Ganadera-2030-Propuestas.pdf");
     });
   }
