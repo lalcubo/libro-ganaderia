@@ -1,0 +1,215 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Libro Digital - Venezuela Ganadera 2030</title>
+  
+  <!-- Meta tags SEO y Open Graph -->
+  <meta name="description" content="Venezuela Ganadera 2030 - Master Plan Nacional para el Desarrollo Ganadero y Pecuario. Edición Digital Interactiva.">
+  <meta name="theme-color" content="#132316">
+  <meta property="og:title" content="Venezuela Ganadera 2030 - Edición Digital">
+  <meta property="og:description" content="Master Plan Nacional para el Desarrollo Ganadero y Pecuario en formato libro digital interactivo.">
+  <meta property="og:type" content="website">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/webp" href="pages/thumbs/page-01.webp">
+
+  <!-- Fuentes e Iconos -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="theme-dark">
+
+  <!-- Pantalla de Carga Inicial -->
+  <div id="loading-screen" class="loading-screen">
+    <div class="loader-content">
+      <div class="book-spinner">
+        <div class="spine"></div>
+        <div class="leaf"></div>
+        <div class="leaf"></div>
+        <div class="leaf"></div>
+      </div>
+      <h2 class="loader-title">VENEZUELA GANADERA 2030</h2>
+      <p class="loader-subtitle">Cargando libro interactivo...</p>
+      <div class="progress-bar-container">
+        <div id="loader-progress" class="progress-bar"></div>
+      </div>
+      <span id="loader-text" class="progress-text">0%</span>
+    </div>
+  </div>
+
+  <!-- Barra Superior de Navegación -->
+  <header class="top-bar">
+    <div class="top-bar-left">
+      <a href="index.html" class="btn-back-home" title="Volver al Portal Principal">
+        <i class="fa-solid fa-arrow-left"></i>
+        <span>Inicio</span>
+      </a>
+      <div class="brand">
+        <i class="fa-solid fa-book-open brand-icon"></i>
+        <div class="brand-text">
+          <span class="brand-title">VENEZUELA GANADERA 2030</span>
+          <span class="brand-subtitle">Master Plan Nacional</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="top-bar-center">
+      <div class="page-badge">
+        <i class="fa-regular fa-file-lines"></i>
+        <span id="page-display">Página 1 / 34</span>
+      </div>
+    </div>
+
+    <div class="top-bar-right">
+      <!-- Controles de Zoom -->
+      <div class="control-group">
+        <button id="btn-zoom-out" class="icon-btn" title="Alejar (-)" aria-label="Alejar">
+          <i class="fa-solid fa-magnifying-glass-minus"></i>
+        </button>
+        <button id="btn-zoom-reset" class="icon-btn" title="Restablecer Zoom" aria-label="Restablecer Zoom">
+          <span id="zoom-level-text">100%</span>
+        </button>
+        <button id="btn-zoom-in" class="icon-btn" title="Acercar (+)" aria-label="Acercar">
+          <i class="fa-solid fa-magnifying-glass-plus"></i>
+        </button>
+      </div>
+
+      <!-- Controles Adicionales -->
+      <div class="control-group">
+        <a href="docs/Venezuela-Ganadera-2030.pdf" download class="icon-btn" title="Descargar PDF Oficial" aria-label="Descargar PDF">
+          <i class="fa-solid fa-download"></i>
+        </a>
+        <button id="btn-sound" class="icon-btn active" title="Sonido de páginas (Activado)" aria-label="Sonido">
+          <i class="fa-solid fa-volume-high"></i>
+        </button>
+        <button id="btn-thumbnails-toggle" class="icon-btn" title="Ver Miniaturas" aria-label="Miniaturas">
+          <i class="fa-solid fa-grip"></i>
+        </button>
+        <button id="btn-fullscreen" class="icon-btn" title="Pantalla Completa (F)" aria-label="Pantalla Completa">
+          <i class="fa-solid fa-expand"></i>
+        </button>
+        <button id="btn-help" class="icon-btn" title="Ayuda y Atajos" aria-label="Ayuda">
+          <i class="fa-solid fa-circle-question"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenedor Principal del Libro -->
+  <main class="flipbook-viewport" id="viewport">
+    <!-- Flechas Flotantes Laterales -->
+    <button id="btn-prev" class="nav-arrow left" title="Página Anterior (←)" aria-label="Página Anterior">
+      <i class="fa-solid fa-chevron-left"></i>
+    </button>
+    <button id="btn-next" class="nav-arrow right" title="Página Siguiente (→)" aria-label="Página Siguiente">
+      <i class="fa-solid fa-chevron-right"></i>
+    </button>
+
+    <!-- Área de Pan / Zoom Wrapper -->
+    <div class="pan-zoom-container" id="pan-container">
+      <div id="flipbook" class="flipbook">
+        <!-- Páginas generadas dinámicamente -->
+      </div>
+    </div>
+  </main>
+
+  <!-- Barra de Navegación Inferior -->
+  <footer class="bottom-bar">
+    <div class="bottom-bar-content">
+      <button id="btn-first" class="btn-nav-control" title="Primera Página (Inicio)">
+        <i class="fa-solid fa-backward-step"></i>
+      </button>
+      <button id="btn-bottom-prev" class="btn-nav-control" title="Anterior">
+        <i class="fa-solid fa-chevron-left"></i> Anterior
+      </button>
+
+      <!-- Slider de Página -->
+      <div class="slider-wrapper">
+        <span class="page-edge-num">1</span>
+        <input type="range" id="page-slider" min="1" max="34" value="1" step="1" aria-label="Deslizador de páginas">
+        <span class="page-edge-num">34</span>
+      </div>
+
+      <button id="btn-bottom-next" class="btn-nav-control" title="Siguiente">
+        Siguiente <i class="fa-solid fa-chevron-right"></i>
+      </button>
+      <button id="btn-last" class="btn-nav-control" title="Última Página (Fin)">
+        <i class="fa-solid fa-forward-step"></i>
+      </button>
+    </div>
+  </footer>
+
+  <!-- Drawer / Panel Desplegable de Miniaturas -->
+  <div id="thumbnails-drawer" class="thumbnails-drawer">
+    <div class="drawer-header">
+      <div class="drawer-title">
+        <i class="fa-solid fa-grip"></i>
+        <span>Índice Visual de Páginas (34)</span>
+      </div>
+      <button id="btn-close-thumbnails" class="btn-close-drawer" title="Cerrar miniaturas">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div class="thumbnails-grid" id="thumbnails-container">
+      <!-- Miniaturas insertadas dinámicamente -->
+    </div>
+  </div>
+
+  <!-- Modal de Ayuda y Atajos de Teclado -->
+  <div id="help-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-keyboard"></i> Controles y Atajos</h3>
+        <button id="btn-close-help" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="shortcut-list">
+          <div class="shortcut-item">
+            <span class="key">←</span> / <span class="key">→</span>
+            <span class="desc">Avanzar o retroceder página</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="key">Clic en Esquinas</span>
+            <span class="desc">Pasar hoja con efecto 3D</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="key">Arrastrar Página</span>
+            <span class="desc">Hojear manualmente como libro real</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="key">Deslizar dedo</span>
+            <span class="desc">Pasar página en celulares</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="key">F</span>
+            <span class="desc">Modo Pantalla Completa</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="key">+</span> / <span class="key">-</span>
+            <span class="desc">Aumentar o reducir Zoom</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="key">Inicio</span> / <span class="key">Fin</span>
+            <span class="desc">Ir a la Portada o última página</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="key">Esc</span>
+            <span class="desc">Restablecer zoom o cerrar paneles</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/page-flip.browser.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -2,15 +2,15 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Venezuela Ganadera 2030 - Master Plan Nacional</title>
-  
-  <!-- Meta tags SEO y Open Graph -->
-  <meta name="description" content="Venezuela Ganadera 2030 - Master Plan Nacional para el Desarrollo Ganadero y Pecuario. Edición Digital Interactiva.">
-  <meta name="theme-color" content="#132316">
-  <meta property="og:title" content="Venezuela Ganadera 2030 - Edición Digital">
-  <meta property="og:description" content="Master Plan Nacional para el Desarrollo Ganadero y Pecuario en formato libro digital interactivo.">
-  <meta property="og:type" content="website">
+
+  <!-- Meta tags SEO -->
+  <meta name="description" content="Una propuesta nacional abierta para construir juntos el futuro de la ganadería y las cadenas pecuarias venezolanas.">
+  <meta name="theme-color" content="#102115">
+  <meta property="og:title" content="Venezuela Ganadera 2030 - Master Plan Nacional">
+  <meta property="og:description" content="60 días para conocerla, enriquecerla y convertirla en una hoja de ruta compartida.">
+  <meta property="og:image" content="img/banner-header.jpg">
 
   <!-- Favicon -->
   <link rel="icon" type="image/webp" href="pages/thumbs/page-01.webp">
@@ -18,191 +18,408 @@
   <!-- Fuentes e Iconos -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-  <!-- Estilos -->
-  <link rel="stylesheet" href="css/style.css">
+  <!-- Estilos del Portal -->
+  <link rel="stylesheet" href="css/portal.css">
 </head>
-<body class="theme-dark">
+<body>
 
-  <!-- Pantalla de Carga Inicial -->
-  <div id="loading-screen" class="loading-screen">
-    <div class="loader-content">
-      <div class="book-spinner">
-        <div class="spine"></div>
-        <div class="leaf"></div>
-        <div class="leaf"></div>
-        <div class="leaf"></div>
-      </div>
-      <h2 class="loader-title">VENEZUELA GANADERA 2030</h2>
-      <p class="loader-subtitle">Cargando libro interactivo...</p>
-      <div class="progress-bar-container">
-        <div id="loader-progress" class="progress-bar"></div>
-      </div>
-      <span id="loader-text" class="progress-text">0%</span>
-    </div>
-  </div>
-
-  <!-- Barra Superior de Navegación -->
-  <header class="top-bar">
-    <div class="top-bar-left">
-      <div class="brand">
-        <i class="fa-solid fa-book-open brand-icon"></i>
-        <div class="brand-text">
-          <span class="brand-title">VENEZUELA GANADERA 2030</span>
-          <span class="brand-subtitle">Master Plan Nacional</span>
+  <!-- Barra de Navegación -->
+  <header class="portal-nav">
+    <div class="container portal-nav-content">
+      <a href="index.html" class="nav-brand">
+        <i class="fa-solid fa-cow nav-brand-icon"></i>
+        <div class="nav-brand-text">
+          <h1>VENEZUELA GANADERA 2030</h1>
+          <span>Master Plan Nacional</span>
         </div>
-      </div>
-    </div>
-
-    <div class="top-bar-center">
-      <div class="page-badge">
-        <i class="fa-regular fa-file-lines"></i>
-        <span id="page-display">Página 1 / 34</span>
-      </div>
-    </div>
-
-    <div class="top-bar-right">
-      <!-- Controles de Zoom -->
-      <div class="control-group">
-        <button id="btn-zoom-out" class="icon-btn" title="Alejar (-)" aria-label="Alejar">
-          <i class="fa-solid fa-magnifying-glass-minus"></i>
-        </button>
-        <button id="btn-zoom-reset" class="icon-btn" title="Restablecer Zoom (100%)" aria-label="Restablecer Zoom">
-          <span id="zoom-level-text">100%</span>
-        </button>
-        <button id="btn-zoom-in" class="icon-btn" title="Acercar (+)" aria-label="Acercar">
-          <i class="fa-solid fa-magnifying-glass-plus"></i>
-        </button>
-      </div>
-
-      <!-- Controles Adicionales -->
-      <div class="control-group">
-        <button id="btn-sound" class="icon-btn active" title="Sonido de páginas (Activado)" aria-label="Sonido">
-          <i class="fa-solid fa-volume-high"></i>
-        </button>
-        <button id="btn-thumbnails-toggle" class="icon-btn" title="Ver Miniaturas" aria-label="Miniaturas">
-          <i class="fa-solid fa-grip"></i>
-        </button>
-        <button id="btn-fullscreen" class="icon-btn" title="Pantalla Completa (F)" aria-label="Pantalla Completa">
-          <i class="fa-solid fa-expand"></i>
-        </button>
-        <button id="btn-help" class="icon-btn" title="Ayuda y Atajos" aria-label="Ayuda">
-          <i class="fa-solid fa-circle-question"></i>
-        </button>
+      </a>
+      <div class="nav-actions">
+        <a href="libro.html" class="nav-btn nav-btn-gold">
+          <i class="fa-solid fa-book-open"></i> <span>Ver Libro Digital</span>
+        </a>
+        <a href="admin.html" class="nav-btn nav-btn-admin" title="Acceso Administrativo">
+          <i class="fa-solid fa-lock"></i>
+        </a>
       </div>
     </div>
   </header>
 
-  <!-- Contenedor Principal del Libro -->
-  <main class="flipbook-viewport" id="viewport">
-    <!-- Flechas Flotantes Laterales -->
-    <button id="btn-prev" class="nav-arrow left" title="Página Anterior (←)" aria-label="Página Anterior">
-      <i class="fa-solid fa-chevron-left"></i>
-    </button>
-    <button id="btn-next" class="nav-arrow right" title="Página Siguiente (→)" aria-label="Página Siguiente">
-      <i class="fa-solid fa-chevron-right"></i>
-    </button>
-
-    <!-- Área de Pan / Zoom Wrapper -->
-    <div class="pan-zoom-container" id="pan-container">
-      <div id="flipbook" class="flipbook">
-        <!-- Páginas generadas dinámicamente -->
+  <!-- Banner Superior Principal -->
+  <section class="hero-banner-section">
+    <div class="container">
+      <div class="banner-card">
+        <img src="img/banner-header.jpg" alt="Venezuela Ganadera 2030 - Master Plan Nacional">
       </div>
     </div>
-  </main>
+  </section>
 
-  <!-- Barra de Navegación Inferior -->
-  <footer class="bottom-bar">
-    <div class="bottom-bar-content">
-      <button id="btn-first" class="btn-nav-control" title="Primera Página (Inicio)">
-        <i class="fa-solid fa-backward-step"></i>
-      </button>
-      <button id="btn-bottom-prev" class="btn-nav-control" title="Anterior">
-        <i class="fa-solid fa-chevron-left"></i> Anterior
-      </button>
+  <!-- Sección de Introducción Oficial -->
+  <section class="intro-section">
+    <div class="container">
+      <article class="intro-card">
+        
+        <div class="badge-consultation">
+          <i class="fa-solid fa-clock"></i>
+          <span>PROCESO DE CONSULTA NACIONAL: 60 DÍAS ACTIVOS</span>
+        </div>
 
-      <!-- Slider de Página -->
-      <div class="slider-wrapper">
-        <span class="page-edge-num">1</span>
-        <input type="range" id="page-slider" min="1" max="34" value="1" step="1" aria-label="Deslizador de páginas">
-        <span class="page-edge-num">34</span>
+        <h2 class="intro-title">VENEZUELA GANADERA 2030</h2>
+        <h3 class="intro-subtitle">Una propuesta nacional abierta para construir juntos</h3>
+
+        <div class="intro-body">
+          <p>
+            <strong>60 días para conocerla, enriquecerla y convertirla en una hoja de ruta compartida.</strong>
+          </p>
+          <p>
+            Venezuela posee un patrimonio que va mucho más allá de la tierra, los rebaños y la infraestructura: el conocimiento acumulado durante generaciones por quienes producen, trabajan, investigan, transforman y conocen las realidades de cada territorio del país.
+          </p>
+          <p>
+            <strong>Venezuela Ganadera 2030</strong> nace de ese conocimiento y de la revisión de experiencias, soluciones y prácticas exitosas desarrolladas tanto en Venezuela como en otros países. Es una propuesta para organizar una visión nacional de recuperación, modernización y desarrollo de la ganadería y de las cadenas pecuarias venezolanas.
+          </p>
+
+          <p class="intro-highlight">
+            Pero no es una obra terminada. Hoy ponemos este Master Plan a disposición del gremio agrícola y pecuario nacional, productores y asociaciones, instituciones públicas, empresas privadas, profesionales y técnicos, academia, organizaciones vinculadas al desarrollo y organismos multilaterales, convencidos de que: <br><br>
+            <em>"Una propuesta nacional será más sólida mientras mayor sea la capacidad colectiva de enriquecerla."</em>
+          </p>
+
+          <p>
+            Durante los próximos 60 días, invitamos a conocer el Plan completo, estudiarlo, adherirse a esta iniciativa y aportar experiencias, observaciones, propuestas y proyectos que puedan fortalecerlo.
+          </p>
+          <p>
+            Al finalizar este período, todos los aportes recibidos serán procesados, organizados y compilados para enriquecer el documento y publicar la versión final de <strong>VENEZUELA GANADERA 2030: Master Plan Nacional para el Desarrollo Ganadero y Pecuario</strong>.
+          </p>
+          <p>
+            No buscamos solamente respaldo a un documento. Buscamos reunir conocimiento, convertir necesidades en prioridades, prioridades en proyectos y proyectos en capacidades capaces de generar resultados para Venezuela.
+          </p>
+
+          <div class="callout-box">
+            <div class="callout-motto">CONÓCELO · ADHIÉRETE · PROPÓN · CONSTRUYAMOS</div>
+            <div class="callout-submotto">El futuro productivo no se escribe desde un solo lugar. Se construye con el conocimiento y la participación de todos.</div>
+          </div>
+
+          <div class="signature-box">
+            <span class="signature-name">José de Jesús Labrador Amaya</span>
+            <span class="signature-role">Productor y dirigente gremial</span>
+          </div>
+        </div>
+
+      </article>
+    </div>
+  </section>
+
+  <!-- Banner de Pilares y Macroejes -->
+  <section class="banner-middle-section">
+    <div class="container">
+      <div class="banner-card">
+        <img src="img/banner-pilares.jpg" alt="5 Pilares Nacionales y 12 Macroejes">
+      </div>
+    </div>
+  </section>
+
+  <!-- Botones de Acción (Grid) -->
+  <section class="actions-section">
+    <div class="container">
+      <div class="actions-grid">
+        
+        <!-- Tarjeta 1: Libro Digital -->
+        <a href="libro.html" class="action-card featured">
+          <div class="action-icon"><i class="fa-solid fa-book-open-reader"></i></div>
+          <h3>Explorar Libro Digital</h3>
+          <p>Lee el Master Plan en formato interactivo 3D con alta definición, navegación por páginas y zoom.</p>
+          <span class="action-link">Abrir Edición Digital <i class="fa-solid fa-arrow-right"></i></span>
+        </a>
+
+        <!-- Tarjeta 2: Adhesión -->
+        <div class="action-card" id="card-adhesion" role="button">
+          <div class="action-icon"><i class="fa-solid fa-handshake"></i></div>
+          <h3>Adherirse a la Iniciativa</h3>
+          <p>Suma tu respaldo como productor, profesional, gremio, empresa o institución al desarrollo nacional.</p>
+          <span class="action-link">Registrar Adhesión <i class="fa-solid fa-plus"></i></span>
+        </div>
+
+        <!-- Tarjeta 3: Presentar Propuesta -->
+        <div class="action-card" id="card-propuesta" role="button">
+          <div class="action-icon"><i class="fa-solid fa-lightbulb"></i></div>
+          <h3>Presentar Propuesta</h3>
+          <p>Aporta tus ideas, proyectos o soluciones técnicas para los 12 Macroejes del Plan Ganadero.</p>
+          <span class="action-link">Enviar Propuesta <i class="fa-solid fa-paper-plane"></i></span>
+        </div>
+
+        <!-- Tarjeta 4: Descargar PDF -->
+        <a href="docs/Venezuela-Ganadera-2030.pdf" download class="action-card">
+          <div class="action-icon"><i class="fa-solid fa-file-pdf"></i></div>
+          <h3>Descargar Documento PDF</h3>
+          <p>Descarga la versión oficial completa en archivo PDF optimizado para leer sin conexión.</p>
+          <span class="action-link">Descargar PDF (6.4 MB) <i class="fa-solid fa-download"></i></span>
+        </a>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Banner Cintillo Conócelo · Adhiérete · Propón -->
+  <section class="banner-cintillo-section">
+    <div class="container">
+      <div class="banner-card">
+        <img src="img/banner-cintillo.jpg" alt="Conócelo · Adhiérete · Propón · Construyamos">
+      </div>
+    </div>
+  </section>
+
+  <!-- Muro Público de Propuestas -->
+  <section class="proposals-section" id="muro-propuestas">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Aportes y Propuestas de la Comunidad</h2>
+        <p class="section-subtitle">Conoce las iniciativas, ideas y proyectos aportados por productores, técnicos y gremios de todo el país.</p>
       </div>
 
-      <button id="btn-bottom-next" class="btn-nav-control" title="Siguiente">
-        Siguiente <i class="fa-solid fa-chevron-right"></i>
-      </button>
-      <button id="btn-last" class="btn-nav-control" title="Última Página (Fin)">
-        <i class="fa-solid fa-forward-step"></i>
-      </button>
+      <!-- Barra de Filtros y Búsqueda -->
+      <div class="proposals-toolbar">
+        <div class="search-box">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="public-search-input" placeholder="Buscar propuesta por palabra o estado...">
+        </div>
+        <div class="filter-box">
+          <select id="public-macroeje-filter">
+            <option value="all">Todos los Macroejes (12)</option>
+            <option value="Unidad y Fortalecimiento Gremial">Macroejes 1 y 2: Unidad y Gremio</option>
+            <option value="Seguridad Integral">Macroeje 3: Seguridad Integral</option>
+            <option value="Alimentación y Pasturas">Macroeje 4: Alimentación y Reservas</option>
+            <option value="Genética y Reproducción">Macroeje 5: Genética y Reproducción</option>
+            <option value="Sanidad y Bioseguridad">Macroeje 6: Sanidad y Trazabilidad</option>
+            <option value="Educación y Tecnología">Macroeje 7: Educación y Extensión</option>
+            <option value="Seguridad Jurídica">Macroeje 8: Seguridad Jurídica</option>
+            <option value="Arquitectura Institucional">Macroeje 9: Capacidad Institucional</option>
+            <option value="Infraestructura y Energía">Macroeje 10: Infraestructura y Agua</option>
+            <option value="Agroindustria y Mercados">Macroeje 11: Agroindustria y Mercados</option>
+            <option value="Sostenibilidad y Resiliencia">Macroeje 12: Sostenibilidad</option>
+            <option value="Financiamiento">Financiamiento: FONDONAGA</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Grid de Propuestas -->
+      <div class="proposals-grid" id="public-proposals-grid">
+        <!-- Renderizado dinámico -->
+      </div>
+
+      <!-- Paginador -->
+      <div class="pagination-container" id="public-pagination"></div>
+    </div>
+  </section>
+
+  <!-- Modal: Formulario de Adhesión -->
+  <div class="modal-backdrop" id="modal-adhesion">
+    <div class="modal-window">
+      <div class="modal-head">
+        <h3><i class="fa-solid fa-handshake"></i> Adhesión al Proyecto</h3>
+        <button class="modal-close-btn" data-close="modal-adhesion"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="form-adhesion" class="modal-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="adh-cedula">Cédula de Identidad <span class="req">*</span></label>
+            <input type="text" id="adh-cedula" class="form-control" placeholder="Ej. V-12345678" required>
+          </div>
+          <div class="form-group">
+            <label for="adh-nombre">Nombres y Apellidos <span class="req">*</span></label>
+            <input type="text" id="adh-nombre" class="form-control" placeholder="Ej. Juan Pérez" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="adh-telefono">Teléfono / WhatsApp <span class="opt">(Opcional)</span></label>
+            <input type="tel" id="adh-telefono" class="form-control" placeholder="Ej. 0414-1234567">
+          </div>
+          <div class="form-group">
+            <label for="adh-correo">Correo Electrónico <span class="opt">(Opcional)</span></label>
+            <input type="email" id="adh-correo" class="form-control" placeholder="Ej. correo@ejemplo.com">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="adh-estado">Estado / Región</label>
+            <select id="adh-estado" class="form-control">
+              <option value="Zulia">Zulia</option>
+              <option value="Táchira">Táchira</option>
+              <option value="Mérida">Mérida</option>
+              <option value="Barinas">Barinas</option>
+              <option value="Apure">Apure</option>
+              <option value="Guárico">Guárico</option>
+              <option value="Anzoátegui">Anzoátegui</option>
+              <option value="Monagas">Monagas</option>
+              <option value="Bolívar">Bolívar</option>
+              <option value="Lara">Lara</option>
+              <option value="Falcón">Falcón</option>
+              <option value="Yaracuy">Yaracuy</option>
+              <option value="Portuguesa">Portuguesa</option>
+              <option value="Cojedes">Cojedes</option>
+              <option value="Carabobo">Carabobo</option>
+              <option value="Aragua">Aragua</option>
+              <option value="Miranda">Miranda</option>
+              <option value="Distrito Capital">Distrito Capital</option>
+              <option value="Trujillo">Trujillo</option>
+              <option value="Sucre">Sucre</option>
+              <option value="Nueva Esparta">Nueva Esparta</option>
+              <option value="Delta Amacuro">Delta Amacuro</option>
+              <option value="Amazonas">Amazonas</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="adh-sector">Sector / Actividad</label>
+            <select id="adh-sector" class="form-control">
+              <option value="Ganadería Bovina">Ganadería Bovina (Carne / Leche)</option>
+              <option value="Ganadería Bufalina">Ganadería Bufalina</option>
+              <option value="Ovino y Caprino">Ovino y Caprino</option>
+              <option value="Sector Avícola">Sector Avícola</option>
+              <option value="Sector Porcino">Sector Porcino</option>
+              <option value="Asociación Gremial">Asociación Gremial</option>
+              <option value="Profesional / Técnico">Profesional / Veterinario / Agrónomo</option>
+              <option value="Academia / Investigación">Academia / Universidad</option>
+              <option value="Agroindustria / Comercio">Agroindustria / Empresa</option>
+              <option value="Estudiante / Comunidad">Estudiante / Ciudadano</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="adh-asociacion">Asociación / Empresa / Finca <span class="opt">(Opcional)</span></label>
+          <input type="text" id="adh-asociacion" class="form-control" placeholder="Ej. ASOGATA / Finca El Roble">
+        </div>
+
+        <button type="submit" class="form-submit-btn">
+          <i class="fa-solid fa-check"></i> Registrar mi Adhesión
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Formulario de Propuesta -->
+  <div class="modal-backdrop" id="modal-propuesta">
+    <div class="modal-window">
+      <div class="modal-head">
+        <h3><i class="fa-solid fa-lightbulb"></i> Presentar Propuesta</h3>
+        <button class="modal-close-btn" data-close="modal-propuesta"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="form-propuesta" class="modal-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="prop-cedula">Cédula de Identidad <span class="req">*</span></label>
+            <input type="text" id="prop-cedula" class="form-control" placeholder="Ej. V-12345678" required>
+          </div>
+          <div class="form-group">
+            <label for="prop-nombre">Nombres y Apellidos <span class="req">*</span></label>
+            <input type="text" id="prop-nombre" class="form-control" placeholder="Ej. Carlos Mendoza" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="prop-telefono">Teléfono / WhatsApp <span class="opt">(Opcional)</span></label>
+            <input type="tel" id="prop-telefono" class="form-control" placeholder="Ej. 0424-9876543">
+          </div>
+          <div class="form-group">
+            <label for="prop-correo">Correo Electrónico <span class="opt">(Opcional)</span></label>
+            <input type="email" id="prop-correo" class="form-control" placeholder="Ej. carlos@gmail.com">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="prop-estado">Estado / Región</label>
+            <select id="prop-estado" class="form-control">
+              <option value="Barinas">Barinas</option>
+              <option value="Zulia">Zulia</option>
+              <option value="Táchira">Táchira</option>
+              <option value="Apure">Apure</option>
+              <option value="Guárico">Guárico</option>
+              <option value="Anzoátegui">Anzoátegui</option>
+              <option value="Monagas">Monagas</option>
+              <option value="Bolívar">Bolívar</option>
+              <option value="Lara">Lara</option>
+              <option value="Falcón">Falcón</option>
+              <option value="Yaracuy">Yaracuy</option>
+              <option value="Portuguesa">Portuguesa</option>
+              <option value="Cojedes">Cojedes</option>
+              <option value="Mérida">Mérida</option>
+              <option value="Carabobo">Carabobo</option>
+              <option value="Aragua">Aragua</option>
+              <option value="Miranda">Miranda</option>
+              <option value="Distrito Capital">Distrito Capital</option>
+              <option value="Trujillo">Trujillo</option>
+              <option value="Sucre">Sucre</option>
+              <option value="Nueva Esparta">Nueva Esparta</option>
+              <option value="Delta Amacuro">Delta Amacuro</option>
+              <option value="Amazonas">Amazonas</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="prop-macroeje">Macroeje Temático</label>
+            <select id="prop-macroeje" class="form-control">
+              <option value="Unidad y Fortalecimiento Gremial">Macroejes 1 y 2: Unidad y Gremio</option>
+              <option value="Seguridad Integral">Macroeje 3: Seguridad Integral</option>
+              <option value="Alimentación y Pasturas">Macroeje 4: Alimentación y Reservas</option>
+              <option value="Genética y Reproducción">Macroeje 5: Genética y Reproducción</option>
+              <option value="Sanidad y Bioseguridad">Macroeje 6: Sanidad y Trazabilidad</option>
+              <option value="Educación y Tecnología">Macroeje 7: Educación y Extensión</option>
+              <option value="Seguridad Jurídica">Macroeje 8: Seguridad Jurídica</option>
+              <option value="Arquitectura Institucional">Macroeje 9: Capacidad Institucional</option>
+              <option value="Infraestructura y Energía">Macroeje 10: Infraestructura y Agua</option>
+              <option value="Agroindustria y Mercados">Macroeje 11: Agroindustria y Mercados</option>
+              <option value="Sostenibilidad y Resiliencia">Macroeje 12: Sostenibilidad</option>
+              <option value="Financiamiento">Financiamiento: FONDONAGA</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="prop-titulo">Título de la Propuesta <span class="req">*</span></label>
+          <input type="text" id="prop-titulo" class="form-control" placeholder="Ej. Plan de bancos forrajeros comunitarios" required>
+        </div>
+
+        <div class="form-group">
+          <label for="prop-detalle">Descripción y Planteamiento <span class="req">*</span></label>
+          <textarea id="prop-detalle" rows="4" class="form-control" placeholder="Detalla tu propuesta, problema que resuelve y beneficios para el sector ganadero..." required></textarea>
+        </div>
+
+        <button type="submit" class="form-submit-btn">
+          <i class="fa-solid fa-paper-plane"></i> Enviar mi Propuesta
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal de Agradecimiento Simple y Respetuoso -->
+  <div class="modal-backdrop" id="modal-gracias">
+    <div class="modal-window">
+      <div class="thankyou-box">
+        <div class="thankyou-icon"><i class="fa-solid fa-check"></i></div>
+        <h3 class="thankyou-title">¡Gracias por su participación!</h3>
+        <p class="thankyou-text" id="gracias-mensaje">
+          Su registro ha sido recibido exitosamente y sumará a la consolidación del Master Plan <strong>Venezuela Ganadera 2030</strong>.
+        </p>
+        <button class="nav-btn nav-btn-gold" id="btn-cerrar-gracias" style="margin: 0 auto;">
+          Continuar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer Institucional -->
+  <footer class="portal-footer">
+    <div class="container">
+      <p><strong>VENEZUELA GANADERA 2030</strong> · Master Plan Nacional para el Desarrollo Ganadero y Pecuario</p>
+      <p>Proceso de Consulta Nacional Abierta · 60 Días de Construcción Colectiva</p>
     </div>
   </footer>
 
-  <!-- Drawer / Panel Desplegable de Miniaturas -->
-  <div id="thumbnails-drawer" class="thumbnails-drawer">
-    <div class="drawer-header">
-      <div class="drawer-title">
-        <i class="fa-solid fa-grip"></i>
-        <span>Índice Visual de Páginas (34)</span>
-      </div>
-      <button id="btn-close-thumbnails" class="btn-close-drawer" title="Cerrar miniaturas">
-        <i class="fa-solid fa-xmark"></i>
-      </button>
-    </div>
-    <div class="thumbnails-grid" id="thumbnails-container">
-      <!-- Miniaturas insertadas dinámicamente -->
-    </div>
-  </div>
-
-  <!-- Modal de Ayuda y Atajos de Teclado -->
-  <div id="help-modal" class="modal-overlay">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3><i class="fa-solid fa-keyboard"></i> Controles y Atajos</h3>
-        <button id="btn-close-help" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body">
-        <div class="shortcut-list">
-          <div class="shortcut-item">
-            <span class="key">←</span> / <span class="key">→</span>
-            <span class="desc">Avanzar o retroceder página</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="key">Clic en Esquinas</span>
-            <span class="desc">Pasar hoja con efecto 3D</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="key">Arrastrar Página</span>
-            <span class="desc">Hojear manualmente como libro real</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="key">Deslizar dedo</span>
-            <span class="desc">Pasar página en móviles y tablets</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="key">F</span>
-            <span class="desc">Modo Pantalla Completa</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="key">+</span> / <span class="key">-</span>
-            <span class="desc">Aumentar o reducir Zoom</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="key">Inicio</span> / <span class="key">Fin</span>
-            <span class="desc">Ir a la Portada o última página</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="key">Esc</span>
-            <span class="desc">Restablecer zoom o cerrar paneles</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Scripts -->
-  <script src="js/page-flip.browser.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/portal.js"></script>
 </body>
 </html>

@@ -1,0 +1,228 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Administración - Venezuela Ganadera 2030</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/webp" href="pages/thumbs/page-01.webp">
+
+  <!-- Fuentes e Iconos -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- jsPDF & autoTable para Exportar a PDF directamente desde el navegador -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="css/portal.css">
+</head>
+<body>
+
+  <!-- Barra de Navegación del Admin -->
+  <header class="portal-nav">
+    <div class="container portal-nav-content">
+      <a href="index.html" class="nav-brand">
+        <i class="fa-solid fa-shield-halved nav-brand-icon"></i>
+        <div class="nav-brand-text">
+          <h1>PANEL DE ADMINISTRACIÓN</h1>
+          <span>Venezuela Ganadera 2030</span>
+        </div>
+      </a>
+      <div class="nav-actions">
+        <a href="index.html" class="nav-btn nav-btn-outline">
+          <i class="fa-solid fa-arrow-left"></i> <span>Ir al Portal</span>
+        </a>
+        <button id="btn-logout" class="nav-btn nav-btn-admin" style="display: none;">
+          <i class="fa-solid fa-right-from-bracket"></i> <span>Salir</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Vista 1: Login de Acceso -->
+  <div id="admin-login-view" class="container">
+    <div class="login-card">
+      <div class="login-icon"><i class="fa-solid fa-lock"></i></div>
+      <h2 style="font-family: 'Cinzel', serif; font-size: 1.3rem; margin-bottom: 8px; color: var(--gold);">Acceso Administrativo</h2>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 24px;">Ingresa tus credenciales para gestionar adheridos y propuestas.</p>
+      
+      <form id="form-admin-login" style="display: flex; flex-direction: column; gap: 14px; text-align: left;">
+        <div class="form-group">
+          <label for="admin-user">Usuario</label>
+          <input type="text" id="admin-user" class="form-control" placeholder="admin" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="admin-pass">Contraseña</label>
+          <input type="password" id="admin-pass" class="form-control" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <div id="login-error-msg" style="color: #ff5252; font-size: 0.82rem; display: none;">Usuario o contraseña incorrectos.</div>
+        <button type="submit" class="form-submit-btn" style="margin-top: 10px;">
+          <i class="fa-solid fa-arrow-right-to-bracket"></i> Iniciar Sesión
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Vista 2: Dashboard de Administración -->
+  <main id="admin-dashboard-view" class="admin-container container" style="display: none;">
+    
+    <!-- Tarjetas de Estadísticas -->
+    <div class="admin-stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon"><i class="fa-solid fa-handshake"></i></div>
+        <div class="stat-data">
+          <h4>Personas Adheridas</h4>
+          <div class="stat-number" id="stat-total-adheridos">0</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon"><i class="fa-solid fa-lightbulb"></i></div>
+        <div class="stat-data">
+          <h4>Propuestas Recibidas</h4>
+          <div class="stat-number" id="stat-total-propuestas">0</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon"><i class="fa-solid fa-map-location-dot"></i></div>
+        <div class="stat-data">
+          <h4>Estados Participantes</h4>
+          <div class="stat-number" id="stat-total-estados">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pestañas de Navegación -->
+    <div class="admin-tabs">
+      <button class="admin-tab-btn active" id="tab-btn-adheridos" data-tab="tab-adheridos">
+        <i class="fa-solid fa-users"></i> Registro de Adhesiones (<span id="badge-count-adheridos">0</span>)
+      </button>
+      <button class="admin-tab-btn" id="tab-btn-propuestas" data-tab="tab-propuestas">
+        <i class="fa-solid fa-file-lines"></i> Banco de Propuestas (<span id="badge-count-propuestas">0</span>)
+      </button>
+    </div>
+
+    <!-- Pestaña 1: Adhesiones -->
+    <section id="tab-adheridos" class="admin-tab-content">
+      <div class="admin-actions-bar">
+        <div class="search-box" style="max-width: 380px;">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="admin-search-adheridos" placeholder="Buscar por cédula, nombre o estado...">
+        </div>
+        <div class="export-group">
+          <button id="btn-export-adheridos-excel" class="btn-export btn-export-excel">
+            <i class="fa-solid fa-file-excel"></i> Exportar a Excel
+          </button>
+          <button id="btn-export-adheridos-pdf" class="btn-export btn-export-pdf">
+            <i class="fa-solid fa-file-pdf"></i> Exportar a PDF
+          </button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Cédula</th>
+              <th>Nombre y Apellido</th>
+              <th>Teléfono</th>
+              <th>Correo</th>
+              <th>Estado</th>
+              <th>Sector / Asociación</th>
+              <th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody id="admin-tbody-adheridos">
+            <!-- Datos dinámicos -->
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination-container" id="admin-pagination-adheridos"></div>
+    </section>
+
+    <!-- Pestaña 2: Propuestas -->
+    <section id="tab-propuestas" class="admin-tab-content" style="display: none;">
+      <div class="admin-actions-bar">
+        <div class="search-box" style="max-width: 320px;">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="admin-search-propuestas" placeholder="Buscar por cédula, título o palabra...">
+        </div>
+        <div class="filter-box">
+          <select id="admin-filter-macroeje">
+            <option value="all">Todos los Macroejes</option>
+            <option value="Unidad y Fortalecimiento Gremial">Macroejes 1 y 2: Unidad y Gremio</option>
+            <option value="Seguridad Integral">Macroeje 3: Seguridad Integral</option>
+            <option value="Alimentación y Pasturas">Macroeje 4: Alimentación y Reservas</option>
+            <option value="Genética y Reproducción">Macroeje 5: Genética y Reproducción</option>
+            <option value="Sanidad y Bioseguridad">Macroeje 6: Sanidad y Trazabilidad</option>
+            <option value="Educación y Tecnología">Macroeje 7: Educación y Extensión</option>
+            <option value="Seguridad Jurídica">Macroeje 8: Seguridad Jurídica</option>
+            <option value="Arquitectura Institucional">Macroeje 9: Capacidad Institucional</option>
+            <option value="Infraestructura y Energía">Macroeje 10: Infraestructura y Agua</option>
+            <option value="Agroindustria y Mercados">Macroeje 11: Agroindustria y Mercados</option>
+            <option value="Sostenibilidad y Resiliencia">Macroeje 12: Sostenibilidad</option>
+            <option value="Financiamiento">Financiamiento: FONDONAGA</option>
+          </select>
+        </div>
+        <div class="export-group">
+          <button id="btn-export-propuestas-excel" class="btn-export btn-export-excel">
+            <i class="fa-solid fa-file-excel"></i> Exportar a Excel
+          </button>
+          <button id="btn-export-propuestas-pdf" class="btn-export btn-export-pdf">
+            <i class="fa-solid fa-file-pdf"></i> Exportar a PDF
+          </button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Cédula</th>
+              <th>Proponente</th>
+              <th>Estado</th>
+              <th>Macroeje</th>
+              <th>Título de Propuesta</th>
+              <th>Fecha</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody id="admin-tbody-propuestas">
+            <!-- Datos dinámicos -->
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination-container" id="admin-pagination-propuestas"></div>
+    </section>
+
+  </main>
+
+  <!-- Modal para Leer Propuesta Completa -->
+  <div class="modal-backdrop" id="modal-ver-propuesta">
+    <div class="modal-window" style="max-width: 650px;">
+      <div class="modal-head">
+        <h3><i class="fa-solid fa-file-lines"></i> Detalle de la Propuesta</h3>
+        <button class="modal-close-btn" data-close="modal-ver-propuesta"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div style="padding: 24px;">
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;" id="modal-prop-tags"></div>
+        <h2 id="modal-prop-titulo" style="font-size: 1.25rem; margin-bottom: 14px; color: #ffffff;"></h2>
+        <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); margin-bottom: 16px;">
+          <p id="modal-prop-detalle" style="white-space: pre-line; line-height: 1.7; color: var(--text-main); font-size: 0.95rem;"></p>
+        </div>
+        <div style="font-size: 0.85rem; color: var(--text-muted); display: grid; grid-template-columns: 1fr 1fr; gap: 8px;" id="modal-prop-autor-info">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/admin.js"></script>
+</body>
+</html>
