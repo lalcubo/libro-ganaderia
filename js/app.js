@@ -4,7 +4,7 @@
  */
 
 document.addEventListener("DOMContentLoaded", () => {
-  const TOTAL_PAGES = 33;
+  const TOTAL_PAGES = 34;
   let pageFlip = null;
   let soundEnabled = true;
   let zoomLevel = 1.0;
@@ -97,7 +97,7 @@ document.addEventListener("DOMContentLoaded", () => {
     for (let i = 1; i <= TOTAL_PAGES; i++) {
       const pageNumStr = i.toString().padStart(2, '0');
       const pageDiv = document.createElement("div");
-      pageDiv.className = `page ${i === 1 ? 'cover-page' : ''}`;
+      pageDiv.className = `page ${i === 1 ? 'cover-page' : ''} ${i === TOTAL_PAGES ? 'back-cover' : ''}`;
       
       const img = document.createElement("img");
       img.src = `pages/page-${pageNumStr}.webp`;
@@ -124,7 +124,13 @@ document.addEventListener("DOMContentLoaded", () => {
       img.loading = "lazy";
 
       const label = document.createElement("span");
-      label.textContent = i === 1 ? 'Portada' : `Pág ${i}`;
+      if (i === 1) {
+        label.textContent = 'Portada';
+      } else if (i === TOTAL_PAGES) {
+        label.textContent = 'Cierre';
+      } else {
+        label.textContent = `Pág ${i}`;
+      }
 
       thumbItem.appendChild(img);
       thumbItem.appendChild(label);
@@ -157,7 +163,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (isMobile) {
       // En móvil calcular el mayor tamaño posible llenando el alto/ancho disponible
-      const availableHeight = viewportHeight - 110; // descontando barras sup e inf
+      const availableHeight = viewportHeight - 110;
       const availableWidth = viewportWidth * 0.98;
 
       let calcWidth = availableWidth;
@@ -208,7 +214,6 @@ document.addEventListener("DOMContentLoaded", () => {
       playPageFlipSound();
       updateUIState(e.data);
       if (zoomLevel > 1.0) {
-        // recentrar suavemente la página al pasar
         translateX = 0;
         translateY = 0;
         applyZoom();
@@ -234,9 +239,13 @@ document.addEventListener("DOMContentLoaded", () => {
   // 4. Actualizar estado de la UI
   function updateUIState(currentPageIndex) {
     const currentNum = currentPageIndex + 1;
-    pageDisplay.innerHTML = currentNum === 1 
-      ? `<span>Portada</span> &nbsp;|&nbsp; 1 / ${TOTAL_PAGES}` 
-      : `Página ${currentNum} / ${TOTAL_PAGES}`;
+    if (currentNum === 1) {
+      pageDisplay.innerHTML = `<span>Portada</span> &nbsp;|&nbsp; 1 / ${TOTAL_PAGES}`;
+    } else if (currentNum === TOTAL_PAGES) {
+      pageDisplay.innerHTML = `<span>Contraportada</span> &nbsp;|&nbsp; ${TOTAL_PAGES} / ${TOTAL_PAGES}`;
+    } else {
+      pageDisplay.innerHTML = `Página ${currentNum} / ${TOTAL_PAGES}`;
+    }
 
     pageSlider.value = currentNum;
 
@@ -343,7 +352,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // Doble toque (Double Tap) para zoom rápido en móviles
     const now = Date.now();
     if (!touchMoved && now - lastTapTime < 300) {
-      // Alternar entre Zoom 1.7x y 1.0x
       if (zoomLevel > 1.0) {
         setZoom(1.0);
       } else {
@@ -357,10 +365,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // 1. Detección de Swipe Horizontal Rápido (Deslizar dedo para pasar página)
     if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2 && elapsed < 400) {
       if (deltaX < -40) {
-        // Deslizó hacia la izquierda -> Página siguiente
         if (pageFlip) pageFlip.flipNext();
       } else if (deltaX > 40) {
-        // Deslizó hacia la derecha -> Página anterior
         if (pageFlip) pageFlip.flipPrev();
       }
       return;
@@ -370,10 +376,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!touchMoved && elapsed < 250 && zoomLevel <= 1.1) {
       const clickX = touch.clientX;
       if (clickX > screenWidth * 0.75) {
-        // Toque en el tercio derecho
         if (pageFlip) pageFlip.flipNext();
       } else if (clickX < screenWidth * 0.25) {
-        // Toque en el tercio izquierdo
         if (pageFlip) pageFlip.flipPrev();
       }
     }
