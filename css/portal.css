@@ -1040,3 +1040,33 @@ body {
     grid-template-columns: 1fr;
   }
 }
+.input-group-cedula {
+  display: flex;
+  gap: 6px;
+}
+
+.select-nacionalidad {
+  width: 65px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--border-subtle);
+  color: var(--gold);
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  padding: 10px 6px;
+  outline: none;
+  font-size: 0.95rem;
+  text-align: center;
+  cursor: pointer;
+}
+
+.select-nacionalidad:focus {
+  border-color: var(--gold);
+}
+
+.input-cedula-onlynum {
+  flex: 1;
+}
+
+.input-uppercase {
+  text-transform: uppercase;
+}

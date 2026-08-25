@@ -2,7 +2,6 @@
  * PORTAL VENEZUELA GANADERA 2030 - Lógica conectada a Vercel Postgres API
  */
 
-// Cache en memoria para navegación instantánea
 let cachedProposals = [];
 let publicCurrentPage = 1;
 const ITEMS_PER_PAGE = 6;
@@ -42,7 +41,6 @@ async function submitProposalToAPI(item) {
   } catch (e) {
     console.warn("No se pudo conectar con la API, guardando en cache local", e);
   }
-  // Fallback local
   cachedProposals.unshift(item);
   localStorage.setItem("vg2030_proposals", JSON.stringify(cachedProposals));
   return { success: true };
@@ -63,7 +61,6 @@ async function submitAdhesionToAPI(item) {
   } catch (e) {
     console.warn("No se pudo conectar con la API, guardando en cache local", e);
   }
-  // Fallback local
   const local = localStorage.getItem("vg2030_adhesions");
   const list = local ? JSON.parse(local) : [];
   list.unshift(item);
@@ -72,6 +69,20 @@ async function submitAdhesionToAPI(item) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  // 1. Forzar que las Cédulas SOLO acepten números en tiempo real
+  document.querySelectorAll(".input-cedula-onlynum").forEach(input => {
+    input.addEventListener("input", (e) => {
+      e.target.value = e.target.value.replace(/[^0-9]/g, "");
+    });
+  });
+
+  // 2. Forzar que los Nombres se escriban en MAYÚSCULAS automáticamente
+  document.querySelectorAll(".input-uppercase").forEach(input => {
+    input.addEventListener("input", (e) => {
+      e.target.value = e.target.value.toUpperCase();
+    });
+  });
+
   // Modales
   const modalAdhesion = document.getElementById("modal-adhesion");
   const modalPropuesta = document.getElementById("modal-propuesta");
@@ -111,24 +122,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     btnCerrarGracias.addEventListener("click", () => closeModal(modalGracias));
   }
 
-  // 1. Enviar Formulario de Adhesión
+  // 3. Enviar Formulario de Adhesión
   const formAdhesion = document.getElementById("form-adhesion");
   if (formAdhesion) {
     formAdhesion.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      const cedula = document.getElementById("adh-cedula").value.trim();
-      const nombre = document.getElementById("adh-nombre").value.trim();
+      const nac = document.getElementById("adh-nacionalidad").value;
+      const cedulaNum = document.getElementById("adh-cedula-num").value.trim();
+      const nombre = document.getElementById("adh-nombre").value.trim().toUpperCase();
       const telefono = document.getElementById("adh-telefono").value.trim();
       const correo = document.getElementById("adh-correo").value.trim();
       const estado = document.getElementById("adh-estado").value;
       const sector = document.getElementById("adh-sector").value;
-      const asociacion = document.getElementById("adh-asociacion").value.trim();
+      const asociacion = document.getElementById("adh-asociacion").value.trim().toUpperCase();
 
-      if (!cedula || !nombre) {
+      if (!cedulaNum || !nombre) {
         alert("Por favor ingrese Cédula y Nombres (campos obligatorios).");
         return;
       }
+
+      const cedulaCompleta = `${nac}${cedulaNum}`;
 
       const submitBtn = formAdhesion.querySelector(".form-submit-btn");
       const originalText = submitBtn.innerHTML;
@@ -137,13 +151,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const newAdhesion = {
         id: "adh-" + Date.now(),
-        cedula,
-        nombre,
+        cedula: cedulaCompleta,
+        nombre: nombre,
         telefono: telefono || "No especificado",
         correo: correo || "No especificado",
         estado,
         sector,
-        asociacion: asociacion || "Particular",
+        asociacion: asociacion || "PARTICULAR",
         fecha: new Date().toISOString().split("T")[0]
       };
 
@@ -154,19 +168,20 @@ document.addEventListener("DOMContentLoaded", async () => {
       formAdhesion.reset();
       closeModal(modalAdhesion);
 
-      graciasMensaje.innerHTML = `Estimado(a) <strong>${nombre}</strong> (C.I. ${cedula}):<br><br>Su adhesión a la iniciativa nacional <strong>Venezuela Ganadera 2030</strong> ha sido registrada con éxito en la base de datos. ¡Gracias por sumar al futuro del campo venezolano!`;
+      graciasMensaje.innerHTML = `Estimado(a) <strong>${nombre}</strong> (C.I. ${cedulaCompleta}):<br><br>Su adhesión a la iniciativa nacional <strong>Venezuela Ganadera 2030</strong> ha sido registrada con éxito en la base de datos. ¡Gracias por sumar al futuro del campo venezolano!`;
       openModal(modalGracias);
     });
   }
 
-  // 2. Enviar Formulario de Propuesta
+  // 4. Enviar Formulario de Propuesta
   const formPropuesta = document.getElementById("form-propuesta");
   if (formPropuesta) {
     formPropuesta.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      const cedula = document.getElementById("prop-cedula").value.trim();
-      const nombre = document.getElementById("prop-nombre").value.trim();
+      const nac = document.getElementById("prop-nacionalidad").value;
+      const cedulaNum = document.getElementById("prop-cedula-num").value.trim();
+      const nombre = document.getElementById("prop-nombre").value.trim().toUpperCase();
       const telefono = document.getElementById("prop-telefono").value.trim();
       const correo = document.getElementById("prop-correo").value.trim();
       const estado = document.getElementById("prop-estado").value;
@@ -174,10 +189,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       const titulo = document.getElementById("prop-titulo").value.trim();
       const detalle = document.getElementById("prop-detalle").value.trim();
 
-      if (!cedula || !nombre || !titulo || !detalle) {
+      if (!cedulaNum || !nombre || !titulo || !detalle) {
         alert("Por favor complete los campos obligatorios (*).");
         return;
       }
+
+      const cedulaCompleta = `${nac}${cedulaNum}`;
 
       const submitBtn = formPropuesta.querySelector(".form-submit-btn");
       const originalText = submitBtn.innerHTML;
@@ -186,8 +203,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const newProposal = {
         id: "prop-" + Date.now(),
-        cedula,
-        nombre,
+        cedula: cedulaCompleta,
+        nombre: nombre,
         telefono: telefono || "No especificado",
         correo: correo || "No especificado",
         estado,
@@ -212,7 +229,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // 3. Render Muro Público con Búsqueda y Paginación
+  // 5. Render Muro Público
   const searchInput = document.getElementById("public-search-input");
   const filterSelect = document.getElementById("public-macroeje-filter");
 
@@ -301,7 +318,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (muro) muro.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Cargar datos iniciales desde la Base de Datos
   await fetchProposalsFromAPI();
   renderPublicProposals();
 });
