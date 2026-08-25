@@ -1,4 +1,4 @@
-﻿/**
+/**
  * PORTAL VENEZUELA GANADERA 2030 - Lógica conectada a Vercel Postgres API
  */
 
@@ -54,15 +54,20 @@ async function submitAdhesionToAPI(item) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(item)
     });
-    if (res.ok) {
-      const result = await res.json();
-      return result;
-    }
+    const result = await res.json();
+    return result;
   } catch (e) {
-    console.warn("No se pudo conectar con la API, guardando en cache local", e);
+    console.warn("No se pudo conectar con la API, validando en cache local", e);
   }
   const local = localStorage.getItem("vg2030_adhesions");
   const list = local ? JSON.parse(local) : [];
+  
+  // Validar duplicado localmente
+  const exists = list.some(a => a.cedula === item.cedula);
+  if (exists) {
+    return { success: false, isDuplicate: true, error: `La cédula ${item.cedula} ya se encuentra registrada.` };
+  }
+
   list.unshift(item);
   localStorage.setItem("vg2030_adhesions", JSON.stringify(list));
   return { success: true };
@@ -161,10 +166,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         fecha: new Date().toISOString().split("T")[0]
       };
 
-      await submitAdhesionToAPI(newAdhesion);
+      const result = await submitAdhesionToAPI(newAdhesion);
 
       submitBtn.innerHTML = originalText;
       submitBtn.disabled = false;
+
+      if (!result.success && result.isDuplicate) {
+        alert(`Aviso: La cédula ${cedulaCompleta} ya se encuentra registrada como adherida a la iniciativa.`);
+        return;
+      }
+
       formAdhesion.reset();
       closeModal(modalAdhesion);
 

@@ -1,4 +1,4 @@
-﻿import { sql } from "@vercel/postgres";
+import { sql } from "@vercel/postgres";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -37,6 +37,16 @@ export default async function handler(req, res) {
 
       if (!cedula || !nombre) {
         return res.status(400).json({ success: false, error: "Cédula y Nombre son obligatorios" });
+      }
+
+      // Validar que la cédula NO esté duplicada en las adhesiones
+      const existing = await sql`SELECT id, nombre FROM adhesiones WHERE cedula = ${cedula};`;
+      if (existing.rows.length > 0) {
+        return res.status(409).json({ 
+          success: false, 
+          error: `La cédula ${cedula} ya se encuentra registrada como adherida a la iniciativa.`,
+          isDuplicate: true 
+        });
       }
 
       const recId = id || ("adh-" + Date.now());
