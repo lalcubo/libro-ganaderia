@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Portal Institucional Venezuela Ganadera 2030",
   "scripts": {
-    "start": "npx serve ."
+    "build": "echo 'Static build ready'"
   },
   "dependencies": {
     "@vercel/postgres": "^0.10.0"

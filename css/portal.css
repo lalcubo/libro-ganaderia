@@ -1070,3 +1070,8 @@ body {
 .input-uppercase {
   text-transform: uppercase;
 }
+.form-group-cedula-wrapper {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
