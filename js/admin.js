@@ -1,15 +1,24 @@
 ﻿/**
  * PORTAL VENEZUELA GANADERA 2030 - Panel de Administración
+ * Incluye gestión de registros, eliminación de adheridos y propuestas, y cambio de clave
  */
 
-// Credenciales de administración
-const ADMIN_USER = "admin";
-const ADMIN_PASS = "ganaderia2030";
+const DEFAULT_ADMIN_USER = "admin";
+const DEFAULT_ADMIN_PASS = "ganaderia2030";
 
-// Estado
+function getAdminPass() {
+  return localStorage.getItem("vg2030_admin_password") || DEFAULT_ADMIN_PASS;
+}
+
+function setAdminPass(newPass) {
+  localStorage.setItem("vg2030_admin_password", newPass);
+}
+
+// Estado de paginación
 let adheridosCurrentPage = 1;
 let propuestasCurrentPage = 1;
 const ADMIN_ITEMS_PER_PAGE = 8;
+let currentViewingPropId = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   const loginView = document.getElementById("admin-login-view");
@@ -17,6 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const formLogin = document.getElementById("form-admin-login");
   const loginErrorMsg = document.getElementById("login-error-msg");
   const btnLogout = document.getElementById("btn-logout");
+  const btnOpenChangePass = document.getElementById("btn-open-change-pass");
 
   // Pestañas
   const tabBtnAdheridos = document.getElementById("tab-btn-adheridos");
@@ -35,22 +45,26 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnExportPropExcel = document.getElementById("btn-export-propuestas-excel");
   const btnExportPropPdf = document.getElementById("btn-export-propuestas-pdf");
 
-  // Modal Ver Propuesta
+  // Modales
   const modalVerPropuesta = document.getElementById("modal-ver-propuesta");
+  const modalChangePass = document.getElementById("modal-change-pass");
+  const formChangePass = document.getElementById("form-change-pass");
+  const cpMsg = document.getElementById("cp-msg");
+  const btnModalDeleteProp = document.getElementById("btn-modal-delete-prop");
 
   // Verificar sesión activa
   if (sessionStorage.getItem("vg2030_admin_auth") === "true") {
     showDashboard();
   }
 
-  // Login
+  // 1. Login
   if (formLogin) {
     formLogin.addEventListener("submit", (e) => {
       e.preventDefault();
       const u = document.getElementById("admin-user").value.trim();
       const p = document.getElementById("admin-pass").value.trim();
 
-      if (u === ADMIN_USER && p === ADMIN_PASS) {
+      if (u === DEFAULT_ADMIN_USER && p === getAdminPass()) {
         sessionStorage.setItem("vg2030_admin_auth", "true");
         loginErrorMsg.style.display = "none";
         showDashboard();
@@ -60,13 +74,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Logout
+  // 2. Logout
   if (btnLogout) {
     btnLogout.addEventListener("click", () => {
       sessionStorage.removeItem("vg2030_admin_auth");
       loginView.style.display = "block";
       dashboardView.style.display = "none";
       btnLogout.style.display = "none";
+      if (btnOpenChangePass) btnOpenChangePass.style.display = "none";
     });
   }
 
@@ -74,10 +89,11 @@ document.addEventListener("DOMContentLoaded", () => {
     loginView.style.display = "none";
     dashboardView.style.display = "block";
     btnLogout.style.display = "inline-flex";
+    if (btnOpenChangePass) btnOpenChangePass.style.display = "inline-flex";
     refreshDashboard();
   }
 
-  // Conmutador de Pestañas
+  // 3. Conmutador de Pestañas
   if (tabBtnAdheridos && tabBtnPropuestas) {
     tabBtnAdheridos.addEventListener("click", () => {
       tabBtnAdheridos.classList.add("active");
@@ -94,10 +110,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Cargar datos
+  // Datos
   function getAdhesionsData() {
     const raw = localStorage.getItem("vg2030_adhesions");
     return raw ? JSON.parse(raw) : [];
+  }
+
+  function saveAdhesionsData(list) {
+    localStorage.setItem("vg2030_adhesions", JSON.stringify(list));
   }
 
   function getProposalsData() {
@@ -105,12 +125,15 @@ document.addEventListener("DOMContentLoaded", () => {
     return raw ? JSON.parse(raw) : [];
   }
 
-  // Actualizar Estadísticas y Tablas
+  function saveProposalsData(list) {
+    localStorage.setItem("vg2030_proposals", JSON.stringify(list));
+  }
+
+  // Actualizar Dashboard
   function refreshDashboard() {
     const adheridos = getAdhesionsData();
     const propuestas = getProposalsData();
 
-    // Contadores
     document.getElementById("stat-total-adheridos").textContent = adheridos.length;
     document.getElementById("stat-total-propuestas").textContent = propuestas.length;
     document.getElementById("badge-count-adheridos").textContent = adheridos.length;
@@ -123,7 +146,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderPropuestasTable();
   }
 
-  // 1. Render Tabla de Adheridos
+  // 4. Render Tabla de Adheridos con Botón de Eliminar
   function renderAdheridosTable() {
     const tbody = document.getElementById("admin-tbody-adheridos");
     const pagination = document.getElementById("admin-pagination-adheridos");
@@ -139,7 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     if (filtered.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">No hay registros de adhesión que coincidan con la búsqueda.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:var(--text-muted);">No hay registros de adhesión que coincidan con la búsqueda.</td></tr>`;
       pagination.innerHTML = "";
       return;
     }
@@ -159,17 +182,21 @@ document.addEventListener("DOMContentLoaded", () => {
         <td><span style="color:var(--gold); font-weight:600;">${a.estado}</span></td>
         <td>${a.sector} <br><small style="color:var(--text-muted);">${a.asociacion || ''}</small></td>
         <td style="white-space:nowrap; font-size:0.8rem; color:var(--text-muted);">${a.fecha}</td>
+        <td>
+          <button class="nav-btn nav-btn-outline" style="padding:4px 8px; font-size:0.75rem; color:#ff5252; border-color:rgba(255,82,82,0.4);" onclick="window.eliminarAdherido('${a.id}')" title="Eliminar registro">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </td>
       </tr>
     `).join("");
 
-    // Paginación Adheridos
     renderPaginationControl(pagination, totalPages, adheridosCurrentPage, (p) => {
       adheridosCurrentPage = p;
       renderAdheridosTable();
     });
   }
 
-  // 2. Render Tabla de Propuestas
+  // 5. Render Tabla de Propuestas con Botón de Eliminar
   function renderPropuestasTable() {
     const tbody = document.getElementById("admin-tbody-propuestas");
     const pagination = document.getElementById("admin-pagination-propuestas");
@@ -208,22 +235,109 @@ document.addEventListener("DOMContentLoaded", () => {
         <td><span class="badge-macroeje">${p.macroeje}</span></td>
         <td style="font-weight:600;">${p.titulo}</td>
         <td style="white-space:nowrap; font-size:0.8rem; color:var(--text-muted);">${p.fecha}</td>
-        <td>
-          <button class="nav-btn nav-btn-outline" style="padding:4px 8px; font-size:0.75rem;" onclick="window.verDetallePropuesta('${p.id}')">
+        <td style="white-space:nowrap;">
+          <button class="nav-btn nav-btn-outline" style="padding:4px 8px; font-size:0.75rem; margin-right:4px;" onclick="window.verDetallePropuesta('${p.id}')">
             <i class="fa-solid fa-eye"></i> Leer
+          </button>
+          <button class="nav-btn nav-btn-outline" style="padding:4px 8px; font-size:0.75rem; color:#ff5252; border-color:rgba(255,82,82,0.4);" onclick="window.eliminarPropuesta('${p.id}')" title="Eliminar propuesta">
+            <i class="fa-solid fa-trash"></i>
           </button>
         </td>
       </tr>
     `).join("");
 
-    // Paginación Propuestas
     renderPaginationControl(pagination, totalPages, propuestasCurrentPage, (p) => {
       propuestasCurrentPage = p;
       renderPropuestasTable();
     });
   }
 
-  // Función genérica de paginación
+  // 6. Eliminar Adherido
+  window.eliminarAdherido = function(id) {
+    const list = getAdhesionsData();
+    const item = list.find(a => a.id === id);
+    if (!item) return;
+
+    if (confirm(`¿Estás seguro de eliminar el registro de adhesión de ${item.nombre} (C.I. ${item.cedula})?`)) {
+      const updated = list.filter(a => a.id !== id);
+      saveAdhesionsData(updated);
+      refreshDashboard();
+    }
+  };
+
+  // 7. Eliminar Propuesta
+  window.eliminarPropuesta = function(id) {
+    const list = getProposalsData();
+    const item = list.find(p => p.id === id);
+    if (!item) return;
+
+    if (confirm(`¿Estás seguro de eliminar la propuesta "${item.titulo}" de ${item.nombre}?`)) {
+      const updated = list.filter(p => p.id !== id);
+      saveProposalsData(updated);
+      if (modalVerPropuesta.classList.contains("open")) {
+        modalVerPropuesta.classList.remove("open");
+      }
+      refreshDashboard();
+    }
+  };
+
+  if (btnModalDeleteProp) {
+    btnModalDeleteProp.addEventListener("click", () => {
+      if (currentViewingPropId) {
+        window.eliminarPropuesta(currentViewingPropId);
+      }
+    });
+  }
+
+  // 8. Cambiar Contraseña del Admin
+  if (btnOpenChangePass) {
+    btnOpenChangePass.addEventListener("click", () => {
+      formChangePass.reset();
+      cpMsg.style.display = "none";
+      modalChangePass.classList.add("open");
+    });
+  }
+
+  if (formChangePass) {
+    formChangePass.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const current = document.getElementById("cp-current").value.trim();
+      const newP = document.getElementById("cp-new").value.trim();
+      const confirmP = document.getElementById("cp-confirm").value.trim();
+
+      if (current !== getAdminPass()) {
+        cpMsg.style.color = "#ff5252";
+        cpMsg.textContent = "La contraseña actual no es correcta.";
+        cpMsg.style.display = "block";
+        return;
+      }
+
+      if (newP !== confirmP) {
+        cpMsg.style.color = "#ff5252";
+        cpMsg.textContent = "Las nuevas contraseñas no coinciden.";
+        cpMsg.style.display = "block";
+        return;
+      }
+
+      if (newP.length < 6) {
+        cpMsg.style.color = "#ff5252";
+        cpMsg.textContent = "La nueva contraseña debe tener al menos 6 caracteres.";
+        cpMsg.style.display = "block";
+        return;
+      }
+
+      setAdminPass(newP);
+      cpMsg.style.color = "#4caf50";
+      cpMsg.textContent = "¡Contraseña actualizada exitosamente!";
+      cpMsg.style.display = "block";
+
+      setTimeout(() => {
+        modalChangePass.classList.remove("open");
+      }, 1500);
+    });
+  }
+
+  // Paginación genérica
   function renderPaginationControl(container, totalPages, currentPage, onSelect) {
     if (totalPages <= 1) {
       container.innerHTML = "";
@@ -261,6 +375,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const propuestas = getProposalsData();
     const p = propuestas.find(item => item.id === id);
     if (!p) return;
+    currentViewingPropId = id;
 
     document.getElementById("modal-prop-tags").innerHTML = `
       <span class="badge-macroeje">${p.macroeje}</span>
@@ -307,7 +422,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (btnExportAdhExcel) {
     btnExportAdhExcel.addEventListener("click", () => {
       const data = getAdhesionsData();
-      let csv = "\uFEFF"; // BOM UTF-8 para que Excel lo abra con tildes y caracteres correctos
+      let csv = "\uFEFF";
       csv += "ID,Cedula,Nombre,Telefono,Correo,Estado,Sector,Asociacion,Fecha\n";
       data.forEach(a => {
         csv += `"${a.id}","${a.cedula}","${a.nombre}","${a.telefono}","${a.correo}","${a.estado}","${a.sector}","${a.asociacion || ''}","${a.fecha}"\n`;
