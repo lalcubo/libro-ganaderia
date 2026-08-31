@@ -1,5 +1,0 @@
-﻿{
-  "installCommand": "npm install",
-  "buildCommand": "echo 'build ok'",
-  "outputDirectory": "."
-}
