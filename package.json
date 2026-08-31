@@ -1,6 +1,7 @@
 ﻿{
   "name": "venezuela-ganadera-2030",
   "version": "1.0.0",
+  "type": "module",
   "description": "Portal Institucional Venezuela Ganadera 2030",
   "dependencies": {
     "@vercel/postgres": "^0.10.0"

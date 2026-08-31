@@ -128,6 +128,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ success: false, error: "Método no permitido" });
   } catch (error) {
     console.error("Error en /api/propuestas:", error);
-    return res.status(500).json({ success: false, error: "Error interno del servidor" });
+    return res.status(500).json({ success: false, error: error.message || "Error interno del servidor" });
   }
 }
