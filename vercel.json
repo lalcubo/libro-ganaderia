@@ -1,7 +1,5 @@
 ﻿{
-  "functions": {
-    "api/*.js": {
-      "includeFiles": "node_modules/**"
-    }
-  }
+  "installCommand": "npm install",
+  "buildCommand": "echo 'build ok'",
+  "outputDirectory": "."
 }
