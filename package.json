@@ -1,9 +1,9 @@
-﻿{
+{
   "name": "venezuela-ganadera-2030",
   "version": "1.0.0",
   "description": "Portal Institucional Venezuela Ganadera 2030",
   "scripts": {
-    "build": "echo 'Static build ready'"
+    "build": "echo Static build ready"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
