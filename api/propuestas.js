@@ -1,12 +1,17 @@
-import { sql } from "@vercel/postgres";
+﻿import { neon } from "@neondatabase/serverless";
+
+function getSql() {
+  const connStr = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+  if (!connStr) return null;
+  return neon(connStr);
+}
 
 let memoryProposals = [];
 
-// Helper de sanitización y prevención de ataques (XSS / Inyecciones)
 function cleanString(str, maxLength = 255) {
   if (typeof str !== "string") return "";
   return str
-    .replace(/<[^>]*>?/gm, "") // Eliminar etiquetas HTML/scripts
+    .replace(/<[^>]*>?/gm, "")
     .trim()
     .slice(0, maxLength);
 }
@@ -20,10 +25,10 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const hasPostgres = !!process.env.POSTGRES_URL;
+  const sql = getSql();
 
   try {
-    if (hasPostgres) {
+    if (sql) {
       await sql`
         CREATE TABLE IF NOT EXISTS propuestas (
           id VARCHAR(64) PRIMARY KEY,
@@ -42,42 +47,46 @@ export default async function handler(req, res) {
 
     // GET: Listar propuestas
     if (req.method === "GET") {
-      if (hasPostgres) {
-        const { rows } = await sql`SELECT * FROM propuestas ORDER BY fecha DESC, id DESC;`;
+      if (sql) {
+        const rows = await sql`SELECT * FROM propuestas ORDER BY fecha DESC, id DESC;`;
         return res.status(200).json({ success: true, data: rows });
       } else {
         return res.status(200).json({ success: true, data: memoryProposals });
       }
     }
 
-    // POST: Registrar propuesta con validaciones de seguridad
+    // POST: Registrar propuesta
     if (req.method === "POST") {
       const { id, cedula, nombre, telefono, correo, estado, macroeje, titulo, detalle, fecha, hp_website } = req.body;
 
-      // 1. Trampa Honeypot contra Bots automatizados
       if (hp_website && hp_website.trim() !== "") {
-        // Silenciosamente responder 200 sin registrar nada
         return res.status(200).json({ success: true, message: "OK" });
       }
 
-      // 2. Sanitización y limpieza de campos
       const cleanCedula = cleanString(cedula, 25).toUpperCase();
       const cleanNombre = cleanString(nombre, 100).toUpperCase();
       const cleanTelefono = cleanString(telefono, 35);
       const cleanCorreo = cleanString(correo, 100).toLowerCase();
       const cleanEstado = cleanString(estado, 50);
       const cleanMacroeje = cleanString(macroeje, 100);
-      const cleanTitulo = cleanString(titulo, 250);
-      const cleanDetalle = cleanString(detalle, 3500);
+      const cleanTitulo = cleanString(titulo, 200);
+      const cleanDetalle = cleanString(detalle, 5000);
       const cleanFecha = cleanString(fecha, 20) || new Date().toISOString().split("T")[0];
       const recId = cleanString(id, 64) || ("prop-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7));
 
-      // 3. Validación de campos obligatorios
       if (!cleanCedula || !cleanNombre || !cleanTitulo || !cleanDetalle) {
-        return res.status(400).json({ success: false, error: "Campos obligatorios requeridos (*)" });
+        return res.status(400).json({ success: false, error: "Todos los campos obligatorios deben ser completados." });
       }
 
-      if (hasPostgres) {
+      if (cleanCedula.length < 5 || !/^[VEJPGCvejpgc]?[0-9.\-\s]+$/.test(cleanCedula)) {
+        return res.status(400).json({ success: false, error: "El formato de cédula/RIF no es válido." });
+      }
+
+      if (cleanCorreo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanCorreo)) {
+        return res.status(400).json({ success: false, error: "El formato del correo electrónico no es válido." });
+      }
+
+      if (sql) {
         await sql`
           INSERT INTO propuestas (id, cedula, nombre, telefono, correo, estado, macroeje, titulo, detalle, fecha)
           VALUES (
@@ -93,8 +102,9 @@ export default async function handler(req, res) {
             ${cleanFecha}
           );
         `;
+        return res.status(201).json({ success: true, message: "Propuesta registrada con éxito", id: recId });
       } else {
-        memoryProposals.unshift({
+        const newRecord = {
           id: recId,
           cedula: cleanCedula,
           nombre: cleanNombre,
@@ -105,19 +115,19 @@ export default async function handler(req, res) {
           titulo: cleanTitulo,
           detalle: cleanDetalle,
           fecha: cleanFecha
-        });
+        };
+        memoryProposals.unshift(newRecord);
+        return res.status(201).json({ success: true, message: "Propuesta registrada con éxito", id: recId });
       }
-
-      return res.status(201).json({ success: true, message: "Propuesta registrada con éxito", id: recId });
     }
 
     // DELETE: Eliminar propuesta
     if (req.method === "DELETE") {
       const { id } = req.query;
+      if (!id) return res.status(400).json({ success: false, error: "ID requerido" });
       const cleanId = cleanString(id, 64);
-      if (!cleanId) return res.status(400).json({ success: false, error: "ID requerido" });
 
-      if (hasPostgres) {
+      if (sql) {
         await sql`DELETE FROM propuestas WHERE id = ${cleanId};`;
       } else {
         memoryProposals = memoryProposals.filter(p => p.id !== cleanId);

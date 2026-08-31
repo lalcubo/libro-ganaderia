@@ -1,4 +1,10 @@
-﻿import { sql } from "@vercel/postgres";
+﻿import { neon } from "@neondatabase/serverless";
+
+function getSql() {
+  const connStr = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+  if (!connStr) return null;
+  return neon(connStr);
+}
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -9,23 +15,28 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  try {
-    // Asegurar que la tabla config exista
-    await sql`
-      CREATE TABLE IF NOT EXISTS config (
-        key VARCHAR(64) PRIMARY KEY,
-        value TEXT NOT NULL
-      );
-    `;
+  const sql = getSql();
 
-    // Obtener contraseña guardada o inicializar por defecto
-    const { rows } = await sql`SELECT value FROM config WHERE key = 'admin_password';`;
+  try {
     let currentPass = "ganaderia2030";
 
-    if (rows.length === 0) {
-      await sql`INSERT INTO config (key, value) VALUES ('admin_password', 'ganaderia2030');`;
-    } else {
-      currentPass = rows[0].value;
+    if (sql) {
+      // Asegurar que la tabla config exista
+      await sql`
+        CREATE TABLE IF NOT EXISTS config (
+          key VARCHAR(64) PRIMARY KEY,
+          value TEXT NOT NULL
+        );
+      `;
+
+      // Obtener contraseña guardada o inicializar por defecto
+      const rows = await sql`SELECT value FROM config WHERE key = 'admin_password';`;
+
+      if (rows.length === 0) {
+        await sql`INSERT INTO config (key, value) VALUES ('admin_password', 'ganaderia2030');`;
+      } else {
+        currentPass = rows[0].value;
+      }
     }
 
     const { action, username, password, currentPassword, newPassword } = req.body;
@@ -48,10 +59,12 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: "La nueva contraseña debe tener al menos 6 caracteres" });
       }
 
-      await sql`
-        INSERT INTO config (key, value) VALUES ('admin_password', ${newPassword})
-        ON CONFLICT (key) DO UPDATE SET value = ${newPassword};
-      `;
+      if (sql) {
+        await sql`
+          INSERT INTO config (key, value) VALUES ('admin_password', ${newPassword})
+          ON CONFLICT (key) DO UPDATE SET value = ${newPassword};
+        `;
+      }
 
       return res.status(200).json({ success: true, message: "Contraseña actualizada con éxito" });
     }
@@ -59,6 +72,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ success: false, error: "Acción no válida" });
   } catch (error) {
     console.error("Error en /api/auth:", error);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({ success: false, error: error.message || "Error de servidor" });
   }
 }
