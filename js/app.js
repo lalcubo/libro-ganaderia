@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VENEZUELA GANADERA 2030 - Flipbook Interactivo
  * Desarrollado con StPageFlip y Web Audio API
  */
@@ -8,9 +8,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let pageFlip = null;
   let soundEnabled = true;
 
-  // Zoom inicial: 1.35x en móviles (lectura cómoda sin desbordar) y 1.0x en escritorio
+  // Zoom inicial: 1.45x en móviles (lectura cómoda sin desbordar) y 1.0x en escritorio
   const isMobileInitial = window.innerWidth <= 768;
-  let zoomLevel = isMobileInitial ? 1.35 : 1.0;
+  let zoomLevel = isMobileInitial ? 1.45 : 1.0;
 
   let isDragging = false;
   let startX = 0, startY = 0;
@@ -317,7 +317,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (zoomLevel > 1.1) {
       setZoom(1.0);
     } else {
-      setZoom(1.35);
+      setZoom(isMobileInitial ? 1.45 : 1.25);
     }
   });
 
@@ -398,7 +398,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (zoomLevel > 1.1) {
         setZoom(1.0);
       } else {
-        setZoom(1.35);
+        setZoom(1.45);
       }
       lastTapTime = 0;
       return;
