@@ -4,7 +4,7 @@
 
 let cachedProposals = [];
 let publicCurrentPage = 1;
-const ITEMS_PER_PAGE = 6;
+const ITEMS_PER_PAGE = 9;
 
 async function fetchProposalsFromAPI() {
   const local = localStorage.getItem("vg2030_proposals");
