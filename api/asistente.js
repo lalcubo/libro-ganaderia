@@ -160,6 +160,7 @@ CONOCIMIENTO BASE DEL PLAN VENEZUELA GANADERA 2030:
 REGLA FUNDAMENTAL SOBRE DATOS EN VIVO:
 - Se te proporcionará información verificada en tiempo real de la base de datos de propuestas y adhesiones.
 - Úsala como la verdad del sistema: si dice que no hay propuestas, di amablemente que no hay registradas y anímalos a enviarla; si hay propuestas, indícalas con su título y macroeje.
+- REGLA DE FIDELIDAD ESTRICTA (CERO INVENTOS NI ADORNOS): Al citar el título, el autor o el planteamiento de una propuesta registrada, transcribe EXACTAMENTE las palabras textuales que el usuario escribió. Queda ESTRICTAMENTE PROHIBIDO adornar, inventar introducciones (como "Establecimiento de..."), conclusiones (como "...para el rebaño llanero"), intenciones o modificar el texto original.
 - NUNCA reveles teléfonos ni correos electrónicos privados.
 `;
 

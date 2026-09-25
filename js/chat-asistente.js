@@ -104,13 +104,21 @@
           </div>
         </div>
 
-        <!-- Preguntas rápidas -->
-        <div class="chat-chips" id="chat-chips">
-          <button class="chat-chip" data-query="¿Cómo registro una propuesta ganadera?">¿Cómo registrar propuesta?</button>
-          <button class="chat-chip" data-query="Quiero verificar si mi propuesta está registrada, mi cédula es ">🔍 Verificar mi propuesta</button>
-          <button class="chat-chip" data-query="¿Cuáles son los 12 macroejes del plan?">12 Macroejes</button>
-          <button class="chat-chip" data-query="¿Qué es el fondo FONDONAGA?">¿Qué es FONDONAGA?</button>
-          <button class="chat-chip" data-query="¿Cuántas propuestas y adhesiones van en el país?">📊 Estadísticas</button>
+        <!-- Preguntas rápidas con navegación -->
+        <div class="chat-chips-wrapper">
+          <button type="button" class="chips-nav-btn" id="chips-nav-prev" aria-label="Anterior" title="Ver anteriores">
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+          <div class="chat-chips" id="chat-chips">
+            <button type="button" class="chat-chip" data-query="¿Cómo registro una propuesta ganadera?">¿Cómo registrar propuesta?</button>
+            <button type="button" class="chat-chip" data-query="Quiero verificar si mi propuesta está registrada, mi cédula es ">🔍 Verificar mi propuesta</button>
+            <button type="button" class="chat-chip" data-query="¿Cuáles son los 12 macroejes del plan?">12 Macroejes</button>
+            <button type="button" class="chat-chip" data-query="¿Qué es el fondo FONDONAGA?">¿Qué es FONDONAGA?</button>
+            <button type="button" class="chat-chip" data-query="¿Cuántas propuestas y adhesiones van en el país?">📊 Estadísticas</button>
+          </div>
+          <button type="button" class="chips-nav-btn" id="chips-nav-next" aria-label="Siguiente" title="Ver siguientes">
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
         </div>
 
         <form class="chat-footer" id="chat-form">
@@ -134,6 +142,17 @@
     const messages = document.getElementById("chat-messages");
     const sendBtn = document.getElementById("chat-send-btn");
     const chips = document.getElementById("chat-chips");
+    const chipsPrev = document.getElementById("chips-nav-prev");
+    const chipsNext = document.getElementById("chips-nav-next");
+
+    if (chipsPrev && chipsNext && chips) {
+      chipsPrev.addEventListener("click", () => {
+        chips.scrollBy({ left: -140, behavior: "smooth" });
+      });
+      chipsNext.addEventListener("click", () => {
+        chips.scrollBy({ left: 140, behavior: "smooth" });
+      });
+    }
 
     // Historial inicial vacío (la primera interacción siempre debe ser del usuario)
     chatHistory = [];
