@@ -256,21 +256,13 @@ Instrucción: Responde a la pregunta del usuario utilizando la información veri
       }
     };
 
-    // 3. LLAMADA RESILIENTE A GEMINI (Con reintento automático si un modelo tiene alta demanda)
-    const models = [
-      "gemini-3.8-flash",
-      "gemini-3.8-flash-lite",
-      "gemini-2.0-flash",
-      "gemini-2.5-flash",
-      "gemini-1.5-flash"
-    ];
-
+    // 3. LLAMADA DIRECTA A GEMINI 3.8 FLASH CON REINTENTO AUTOMÁTICO
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
     let replyText = null;
     let lastError = null;
 
-    for (const m of models) {
+    for (let intento = 1; intento <= 3; intento++) {
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(apiKey)}`;
         const response = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -281,16 +273,20 @@ Instrucción: Responde a la pregunta del usuario utilizando la información veri
 
         if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
           replyText = data.candidates[0].content.parts[0].text;
-          break; // Respuesta exitosa obtenida
+          break; // Éxito
         }
 
-        const errorMsg = data.error?.message || `HTTP ${response.status}`;
-        lastError = errorMsg;
-        // Si hay alta demanda o no disponible, probar el siguiente modelo automáticamente
-        continue;
+        lastError = data.error?.message || `HTTP ${response.status}`;
+        
+        // Si hay sobrecarga temporal, esperar antes del siguiente intento
+        if (intento < 3) {
+          await new Promise(r => setTimeout(r, 800 * intento));
+        }
       } catch (e) {
         lastError = e.message;
-        continue;
+        if (intento < 3) {
+          await new Promise(r => setTimeout(r, 800 * intento));
+        }
       }
     }
 
@@ -298,10 +294,10 @@ Instrucción: Responde a la pregunta del usuario utilizando la información veri
       if (lastError && (lastError.includes("high demand") || lastError.includes("demand"))) {
         return res.status(200).json({
           success: true,
-          reply: "Los servidores de Google presentan alta demanda en este segundo. Por favor pulsa enviar nuevamente."
+          reply: "Los servidores de Google reportan alta demanda momentánea. Por favor envía de nuevo tu consulta en unos segundos."
         });
       }
-      throw new Error(`Google API: ${lastError || "No se obtuvo respuesta"}`);
+      throw new Error(`Google API: ${lastError || "Sin respuesta"}`);
     }
 
     return res.status(200).json({
