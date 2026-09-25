@@ -12,6 +12,123 @@ function cleanCedula(str) {
   return String(str).replace(/\D/g, "");
 }
 
+// Filtro de seguridad básico contra Prompt Injection
+function contieneInyeccion(texto) {
+  const patronesPeligrosos = [
+    /ignora\s+(todas\s+)?(las\s+)?instrucciones/i,
+    /ignore\s+(all\s+)?previous\s+instructions/i,
+    /system\s*prompt/i,
+    /revela\s+(tu\s+)?(prompt|clave|api\s*key)/i,
+    /olvida\s+lo\s+anterior/i,
+    /act\s+as\s+dan/i,
+    /modo\s+desarrollador/i,
+    /environmental?\s*variables?/i
+  ];
+  return patronesPeligrosos.some(p => p.test(texto));
+}
+
+// Palabras comunes a ignorar en búsquedas
+const STOPWORDS = new Set([
+  "hay", "alguna", "algun", "alguno", "propuesta", "propuestas", "sobre", "para", "como", "esta", 
+  "este", "estos", "estas", "cual", "cuales", "donde", "cuando", "quien", "por", "que", "del", 
+  "las", "los", "una", "uno", "unos", "unas", "con", "sin", "registrada", "registrado", "tienen"
+]);
+
+// Investigar en la base de datos de Neon según el mensaje del usuario
+async function investigarEnBaseDeDatos(mensaje) {
+  const sql = getSql();
+  if (!sql) {
+    return "Nota del sistema: Base de datos no conectada en este entorno.";
+  }
+
+  const hallazgos = [];
+  const cedulaCoincidencias = mensaje.match(/\b\d{5,9}\b/g);
+
+  try {
+    // 1. Si el usuario escribió un número de cédula
+    if (cedulaCoincidencias && cedulaCoincidencias.length > 0) {
+      for (const num of cedulaCoincidencias.slice(0, 2)) {
+        const props = await sql`
+          SELECT titulo, macroeje, estado, fecha, detalle 
+          FROM propuestas 
+          WHERE cedula LIKE ${'%' + num + '%'} 
+          LIMIT 3;
+        `;
+
+        const adhs = await sql`
+          SELECT nombre, estado, sector, asociacion, fecha 
+          FROM adhesiones 
+          WHERE cedula LIKE ${'%' + num + '%'} 
+          LIMIT 1;
+        `;
+
+        if (props.length > 0) {
+          hallazgos.push(`PROPUESTAS ENCONTRADAS PARA CÉDULA ${num}: ` + JSON.stringify(props.map(p => ({
+            titulo: p.titulo,
+            macroeje: p.macroeje,
+            estado: p.estado,
+            fecha: p.fecha,
+            resumen: p.detalle ? p.detalle.substring(0, 150) + "..." : ""
+          }))));
+        } else {
+          hallazgos.push(`BÚSQUEDA DE PROPUESTA: No hay ninguna propuesta registrada con la cédula ${num}.`);
+        }
+
+        if (adhs.length > 0) {
+          hallazgos.push(`ADHESIÓN ENCONTRADA: ${adhs[0].nombre} está adherido/a desde ${adhs[0].estado} (${adhs[0].fecha}).`);
+        } else {
+          hallazgos.push(`BÚSQUEDA DE ADHESIÓN: No figura registro de adhesión con la cédula ${num}.`);
+        }
+      }
+    }
+
+    // 2. Si pregunta por temas, proyectos o palabras clave
+    const palabras = mensaje
+      .toLowerCase()
+      .replace(/[¿?¡!.,;:()]/g, " ")
+      .split(/\s+/)
+      .filter(w => w.length >= 3 && !STOPWORDS.has(w));
+
+    if (palabras.length > 0 && !cedulaCoincidencias) {
+      // Buscar por la frase o por palabras clave relevantes
+      const termino = palabras.join(" ");
+      const rows = await sql`
+        SELECT titulo, macroeje, estado, fecha, detalle 
+        FROM propuestas 
+        WHERE LOWER(titulo) LIKE ${'%' + termino + '%'} 
+           OR LOWER(detalle) LIKE ${'%' + termino + '%'}
+           OR LOWER(macroeje) LIKE ${'%' + termino + '%'}
+        LIMIT 4;
+      `;
+
+      if (rows.length > 0) {
+        hallazgos.push(`PROPUESTAS ENCONTRADAS EN EL SISTEMA SOBRE '${termino}': ` + JSON.stringify(rows.map(r => ({
+          titulo: r.titulo,
+          macroeje: r.macroeje,
+          estado: r.estado,
+          fecha: r.fecha,
+          resumen: r.detalle ? r.detalle.substring(0, 160) + "..." : ""
+        }))));
+      } else {
+        hallazgos.push(`BÚSQUEDA EN BASE DE DATOS: Actualmente no hay propuestas registradas sobre '${termino}'. Invita al usuario a presentar su propuesta en la web.`);
+      }
+    }
+
+    // 3. Si pregunta por estadísticas, conteos o números globales
+    if (/\b(cu[aá]ntas?|total|estad[ií]sticas?|conteo|resumen)\b/i.test(mensaje)) {
+      const pCount = await sql`SELECT COUNT(*) as count FROM propuestas;`;
+      const aCount = await sql`SELECT COUNT(*) as count FROM adhesiones;`;
+      hallazgos.push(`ESTADÍSTICAS NACIONALES EN VIVO: Total propuestas registradas: ${pCount[0]?.count || 0}. Total adhesiones de respaldo: ${aCount[0]?.count || 0}.`);
+    }
+
+  } catch (err) {
+    console.error("Error consultando base de datos para contexto:", err.message);
+    hallazgos.push("Nota: No se pudo conectar a la base de datos en vivo en este momento.");
+  }
+
+  return hallazgos.length > 0 ? hallazgos.join("\n") : "Búsqueda en base de datos: Sin coincidencias directas.";
+}
+
 // Descripción del conocimiento del Plan Venezuela Ganadera 2030
 const SYSTEM_PROMPT = `
 Eres "AgroAsistente 2030", el Asistente de Inteligencia Artificial Oficial del proyecto nacional "Venezuela Ganadera 2030: Master Plan Nacional para el Desarrollo Ganadero y Pecuario".
@@ -21,6 +138,7 @@ TONO Y PERSONALIDAD:
 - Eres respetuoso, formal pero cercano y empático con el hombre y la mujer del campo venezolano.
 - Utilizas un lenguaje claro, profesional y positivo. Conoces la terminología ganadera venezolana (pastos, forrajes, rebaño, genética, FONDONAGA, macroejes, asociaciones ganaderas, FEDENAGA, etc.).
 - Respuestas claras, concisas y bien formateadas con viñetas cuando sea útil.
+- Responde siempre en español.
 
 CONOCIMIENTO BASE DEL PLAN VENEZUELA GANADERA 2030:
 - Líder / Promotor del proyecto: José de Jesús Labrador Amaya (Productor y dirigente gremial venezolano).
@@ -41,247 +159,25 @@ CONOCIMIENTO BASE DEL PLAN VENEZUELA GANADERA 2030:
   12. Sostenibilidad y Resiliencia (ganadería regenerativa, sistemas silvopastoriles, balance hídrico y ambiental).
 - Financiamiento Especial: FONDONAGA (Fondo Nacional Ganadero propuesto para apalancar créditos e inversión con reglas claras).
 
-INSTRUCCIONES DE USO DE HERRAMIENTAS:
-- Si un usuario pregunta si hay propuestas de un tema (ej: paneles solares, pastos, genética, etc.) o pregunta por su propuesta con cédula o nombre, DEBES USAR la herramienta 'consultar_propuesta'.
-- Si pregunta si su firma o adhesión está en el sistema, DEBES USAR 'consultar_adhesion'.
-- Si pregunta cuántas propuestas o adhesiones van en un estado o en el país, DEBES USAR 'obtener_estadisticas'.
-- Si NO tienes herramientas que apliquen (por ejemplo, preguntas generales sobre el libro, los macroejes o cómo participar), responde directamente con tu conocimiento.
-- Por privacidad, NUNCA expongas teléfonos completos ni correos electrónicos privados en tus respuestas.
+REGLA FUNDAMENTAL SOBRE DATOS EN VIVO:
+- Se te proporcionará información verificada en tiempo real de la base de datos de propuestas y adhesiones.
+- Úsala como la verdad del sistema: si dice que no hay propuestas, di amablemente que no hay registradas y anímalos a enviarla; si hay propuestas, indícalas con su título y macroeje.
+- NUNCA reveles teléfonos ni correos electrónicos privados.
 `;
 
-const TOOLS_DECLARATIONS = [
-  {
-    name: "consultar_propuesta",
-    description: "Busca en la base de datos si existen propuestas registradas por productores mediante su número de cédula o palabra clave sobre el tema.",
-    parameters: {
-      type: "OBJECT",
-      properties: {
-        cedula: {
-          type: "STRING",
-          description: "Número de cédula del productor (ej: 12345678, V-12345678)"
-        },
-        palabraClave: {
-          type: "STRING",
-          description: "Palabra clave o tema de la propuesta (ej: solar, pasto, genética, queso)"
-        }
-      }
-    }
-  },
-  {
-    name: "consultar_adhesion",
-    description: "Verifica si una persona, productor o gremio ya registró su adhesión de respaldo al Plan Venezuela Ganadera 2030 mediante su cédula.",
-    parameters: {
-      type: "OBJECT",
-      properties: {
-        cedula: {
-          type: "STRING",
-          description: "Número de cédula del adherente"
-        }
-      },
-      required: ["cedula"]
-    }
-  },
-  {
-    name: "obtener_estadisticas",
-    description: "Obtiene estadísticas del sistema: total de propuestas recibidas y total de adhesiones a nivel nacional o por estado.",
-    parameters: {
-      type: "OBJECT",
-      properties: {
-        estado: {
-          type: "STRING",
-          description: "Nombre del estado venezolano (opcional, ej. Barinas, Zulia, Guárico)"
-        }
-      }
-    }
-  }
-];
-
-// Ejecución de herramientas en Neon Postgres
-async function ejecutarHerramienta(name, args = {}) {
-  const sql = getSql();
-
-  try {
-    if (name === "consultar_propuesta") {
-      const numCedula = cleanCedula(args.cedula);
-      const palabra = (args.palabraClave || "").trim().toLowerCase();
-
-      if (!sql) {
-        return {
-          encontrado: false,
-          mensaje: "La base de datos de propuestas aún no está configurada o conectada en este entorno."
-        };
-      }
-
-      let rows = [];
-      if (numCedula && numCedula.length >= 4) {
-        rows = await sql`
-          SELECT id, cedula, nombre, estado, macroeje, titulo, detalle, fecha 
-          FROM propuestas 
-          WHERE cedula LIKE ${'%' + numCedula + '%'}
-          ORDER BY fecha DESC LIMIT 4;
-        `;
-      } else if (palabra.length >= 2) {
-        rows = await sql`
-          SELECT id, cedula, nombre, estado, macroeje, titulo, detalle, fecha 
-          FROM propuestas 
-          WHERE LOWER(titulo) LIKE ${'%' + palabra + '%'} OR LOWER(detalle) LIKE ${'%' + palabra + '%'}
-          ORDER BY fecha DESC LIMIT 4;
-        `;
-      }
-
-      if (!rows || rows.length === 0) {
-        return {
-          encontrado: false,
-          total: 0,
-          mensaje: palabra 
-            ? `No se encontraron propuestas registradas con el término '${palabra}'. Invita al usuario a postular su proyecto en la sección 'Presentar Propuesta'.`
-            : "No se encontraron propuestas registradas con esos datos."
-        };
-      }
-
-      return {
-        encontrado: true,
-        total: rows.length,
-        propuestas: rows.map(r => ({
-          titulo: r.titulo,
-          nombreProponente: r.nombre,
-          estado: r.estado,
-          macroeje: r.macroeje,
-          fecha: r.fecha,
-          resumenDetalle: r.detalle ? r.detalle.substring(0, 180) + "..." : ""
-        }))
-      };
-    }
-
-    if (name === "consultar_adhesion") {
-      const numCedula = cleanCedula(args.cedula);
-      if (!numCedula || numCedula.length < 4) {
-        return { encontrado: false, mensaje: "Se requiere un número de cédula válido para verificar la adhesión." };
-      }
-
-      if (!sql) {
-        return { encontrado: false, mensaje: "Base de datos en vivo no disponible actualmente." };
-      }
-
-      const rows = await sql`
-        SELECT nombre, estado, sector, asociacion, fecha 
-        FROM adhesiones 
-        WHERE cedula LIKE ${'%' + numCedula + '%'}
-        LIMIT 1;
-      `;
-
-      if (!rows || rows.length === 0) {
-        return {
-          encontrado: false,
-          mensaje: "No se encontró ningún registro de adhesión con esa cédula. Puedes invitar a la persona a sumarse pulsando el botón 'Adherirme al Proyecto'."
-        };
-      }
-
-      return {
-        encontrado: true,
-        adhesion: rows[0]
-      };
-    }
-
-    if (name === "obtener_estadisticas") {
-      if (!sql) {
-        return { totalPropuestas: 0, totalAdhesiones: 0, nota: "Base de datos no conectada" };
-      }
-
-      const estado = (args.estado || "").trim();
-      let propCount = 0;
-      let adhCount = 0;
-
-      if (estado) {
-        const p = await sql`SELECT COUNT(*) as count FROM propuestas WHERE LOWER(estado) = LOWER(${estado});`;
-        const a = await sql`SELECT COUNT(*) as count FROM adhesiones WHERE LOWER(estado) = LOWER(${estado});`;
-        propCount = Number(p[0]?.count || 0);
-        adhCount = Number(a[0]?.count || 0);
-      } else {
-        const p = await sql`SELECT COUNT(*) as count FROM propuestas;`;
-        const a = await sql`SELECT COUNT(*) as count FROM adhesiones;`;
-        propCount = Number(p[0]?.count || 0);
-        adhCount = Number(a[0]?.count || 0);
-      }
-
-      return {
-        filtroEstado: estado || "Nacional",
-        totalPropuestas: propCount,
-        totalAdhesiones: adhCount
-      };
-    }
-
-    return { error: `Herramienta desconocida: ${name}` };
-  } catch (err) {
-    console.error("Error en ejecución de herramienta SQL:", err.message);
-    return {
-      encontrado: false,
-      mensaje: "No fue posible consultar la base de datos en este instante (" + err.message + ")."
-    };
-  }
-}
-
-// Modelo oficial activo indicado por Google para nuevas cuentas
-let cachedModel = "gemini-3.8-flash";
-
-async function obtenerModeloDisponible(apiKey) {
-  if (cachedModel) return cachedModel;
-  return "gemini-3.8-flash";
-}
-
-// Llamada a la API de Gemini
-async function llamarGemini(apiKey, contents, toolsDeclarations = null) {
-  const model = await obtenerModeloDisponible(apiKey);
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-  const payload = {
-    system_instruction: {
-      parts: [{ text: SYSTEM_PROMPT }]
-    },
-    contents: contents,
-    generationConfig: {
-      temperature: 0.4,
-      maxOutputTokens: 900
-    }
-  };
-
-  if (toolsDeclarations && toolsDeclarations.length > 0) {
-    payload.tools = [
-      {
-        function_declarations: toolsDeclarations
-      }
-    ];
-  }
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    const errorMsg = data.error?.message || `HTTP ${response.status}`;
-    throw new Error(`Google (${model}): ${errorMsg}`);
-  }
-
-  return data;
-}
-
-// Normalizar historial para cumplir con las reglas estrictas de Gemini
-function prepararContents(history, nuevoMensaje) {
+// Normalizar historial para cumplir con las reglas estrictas de Gemini (USER, MODEL alternado)
+function prepararContents(history, nuevoMensajeConDatos) {
   const list = [];
 
   if (Array.isArray(history)) {
-    for (const item of history.slice(-6)) {
+    for (const item of history.slice(-4)) {
       if (!item || !item.text) continue;
       const role = item.sender === "user" ? "user" : "model";
       list.push({ role, text: String(item.text).trim() });
     }
   }
 
-  // Filtrar para que SIEMPRE empiece con un mensaje de 'user'
+  // Descartar mensajes iniciales que no sean del usuario
   while (list.length > 0 && list[0].role !== "user") {
     list.shift();
   }
@@ -303,13 +199,13 @@ function prepararContents(history, nuevoMensaje) {
     }
   }
 
-  // Agregar el mensaje actual del usuario garantizando alternancia
+  // Agregar el mensaje actual del usuario garantizando rol USER
   if (ultimoRol === "user" && contents.length > 0) {
-    contents[contents.length - 1].parts[0].text += "\n" + nuevoMensaje;
+    contents[contents.length - 1].parts[0].text += "\n" + nuevoMensajeConDatos;
   } else {
     contents.push({
       role: "user",
-      parts: [{ text: nuevoMensaje }]
+      parts: [{ text: nuevoMensajeConDatos }]
     });
   }
 
@@ -345,64 +241,64 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, error: "El mensaje es requerido" });
     }
 
-    const cleanMessage = message.trim();
-    const contents = prepararContents(history, cleanMessage);
+    const cleanMessage = message.trim().slice(0, 500);
 
-    // 1ra Llamada a Gemini (con herramientas disponibles)
-    const geminiRes = await llamarGemini(apiKey, contents, TOOLS_DECLARATIONS);
-
-    if (!geminiRes || !geminiRes.candidates || geminiRes.candidates.length === 0) {
+    // Prevención de Prompt Injection
+    if (contieneInyeccion(cleanMessage)) {
       return res.status(200).json({
         success: true,
-        reply: "No pude obtener una respuesta estructurada en este momento. Por favor reformula tu consulta."
+        reply: "Hola. Como asistente de Venezuela Ganadera 2030, solo estoy autorizado para brindar información sobre el Master Plan Ganadero, macroejes, propuestas y adhesiones del sector."
       });
     }
 
-    const candidate = geminiRes.candidates[0];
+    // 1. INVESTIGACIÓN EN TIEMPO REAL EN NEON POSTGRES
+    const datosInvestigados = await investigarEnBaseDeDatos(cleanMessage);
 
-    // Verificar si Gemini decidió llamar a una herramienta (Function Calling)
-    const parts = candidate.content?.parts || [];
-    const functionCallPart = parts.find(p => p.functionCall);
+    // 2. CONSTRUIR PROMPT ENRIQUECIDO CON DATOS VERIFICADOS
+    const mensajeEnriquecido = `
+Pregunta del usuario:
+"${cleanMessage}"
 
-    if (functionCallPart) {
-      const { name, args } = functionCallPart.functionCall;
-      
-      // Ejecutar la consulta en la base de datos
-      const toolResult = await ejecutarHerramienta(name, args);
+[INFORMACIÓN VERIFICADA EN BASE DE DATOS DEL SISTEMA]:
+${datosInvestigados}
 
-      // Agregar la respuesta del modelo y el resultado de la función para la segunda vuelta
-      contents.push({
-        role: "model",
-        parts: [{ functionCall: { name, args } }]
-      });
+Instrucción: Responde a la pregunta del usuario utilizando la información verificada de la base de datos cuando aplique, y tus conocimientos del Plan Venezuela Ganadera 2030. Si no hay registros de lo que busca, explícaselo amablemente e invítalo a participar.
+    `.trim();
 
-      contents.push({
-        role: "function",
-        parts: [
-          {
-            functionResponse: {
-              name: name,
-              response: { output: toolResult }
-            }
-          }
-        ]
-      });
+    const contents = prepararContents(history, mensajeEnriquecido);
 
-      // 2da Llamada a Gemini para sintetizar la respuesta final en lenguaje natural
-      const finalRes = await llamarGemini(apiKey, contents, null);
-      const finalText = finalRes?.candidates?.[0]?.content?.parts?.[0]?.text;
+    // 3. LLAMADA DIRECTA A GEMINI (Roles USER y MODEL 100% compatibles)
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-      return res.status(200).json({
-        success: true,
-        reply: finalText || "He verificado la información en el sistema, pero no pude generar un resumen detallado."
-      });
+    const payload = {
+      system_instruction: {
+        parts: [{ text: SYSTEM_PROMPT }]
+      },
+      contents: contents,
+      generationConfig: {
+        temperature: 0.4,
+        maxOutputTokens: 900
+      }
+    };
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const errorMsg = data.error?.message || `HTTP ${response.status}`;
+      throw new Error(`Google API: ${errorMsg}`);
     }
 
-    // Si no hubo llamada a herramientas, devolver el texto directo
-    const directText = parts.find(p => p.text)?.text || "Disculpa, no entendí bien la consulta.";
+    const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
     return res.status(200).json({
       success: true,
-      reply: directText
+      reply: replyText || "He consultado el sistema pero no pude estructurar una respuesta. ¿Podrías reformular tu pregunta?"
     });
 
   } catch (err) {
