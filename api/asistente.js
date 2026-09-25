@@ -267,9 +267,6 @@ Instrucción: Responde a la pregunta del usuario utilizando la información veri
 
     const contents = prepararContents(history, mensajeEnriquecido);
 
-    // 3. LLAMADA DIRECTA A GEMINI (Roles USER y MODEL 100% compatibles)
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-
     const payload = {
       system_instruction: {
         parts: [{ text: SYSTEM_PROMPT }]
@@ -281,24 +278,57 @@ Instrucción: Responde a la pregunta del usuario utilizando la información veri
       }
     };
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    // 3. LLAMADA RESILIENTE A GEMINI (Con reintento automático si un modelo tiene alta demanda)
+    const models = [
+      "gemini-3.8-flash",
+      "gemini-3.8-flash-lite",
+      "gemini-2.0-flash",
+      "gemini-2.5-flash",
+      "gemini-1.5-flash"
+    ];
 
-    const data = await response.json();
+    let replyText = null;
+    let lastError = null;
 
-    if (!response.ok) {
-      const errorMsg = data.error?.message || `HTTP ${response.status}`;
-      throw new Error(`Google API: ${errorMsg}`);
+    for (const m of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+          replyText = data.candidates[0].content.parts[0].text;
+          break; // Respuesta exitosa obtenida
+        }
+
+        const errorMsg = data.error?.message || `HTTP ${response.status}`;
+        lastError = errorMsg;
+        // Si hay alta demanda o no disponible, probar el siguiente modelo automáticamente
+        continue;
+      } catch (e) {
+        lastError = e.message;
+        continue;
+      }
     }
 
-    const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!replyText) {
+      if (lastError && (lastError.includes("high demand") || lastError.includes("demand"))) {
+        return res.status(200).json({
+          success: true,
+          reply: "Los servidores de Google presentan alta demanda en este segundo. Por favor pulsa enviar nuevamente."
+        });
+      }
+      throw new Error(`Google API: ${lastError || "No se obtuvo respuesta"}`);
+    }
 
     return res.status(200).json({
       success: true,
-      reply: replyText || "He consultado el sistema pero no pude estructurar una respuesta. ¿Podrías reformular tu pregunta?"
+      reply: replyText
     });
 
   } catch (err) {
