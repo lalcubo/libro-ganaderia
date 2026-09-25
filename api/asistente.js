@@ -221,53 +221,12 @@ async function ejecutarHerramienta(name, args = {}) {
   }
 }
 
-// Descubrimiento dinámico del mejor modelo disponible para la API Key
-let cachedModel = null;
+// Modelo oficial activo indicado por Google para nuevas cuentas
+let cachedModel = "gemini-3.8-flash";
 
 async function obtenerModeloDisponible(apiKey) {
   if (cachedModel) return cachedModel;
-
-  try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
-    if (res.ok) {
-      const data = await res.json();
-      const models = data.models || [];
-      
-      // Filtrar los que admiten generateContent
-      const compatibles = models.filter(m => 
-        Array.isArray(m.supportedGenerationMethods) && 
-        m.supportedGenerationMethods.includes("generateContent")
-      );
-
-      // Prioridad 1: modelos flash (rápidos y económicos)
-      const flashModel = compatibles.find(m => m.name.includes("flash"));
-      if (flashModel) {
-        cachedModel = flashModel.name.replace(/^models\//, "");
-        return cachedModel;
-      }
-
-      // Prioridad 2: cualquier modelo gemini compatible
-      const geminiModel = compatibles.find(m => m.name.includes("gemini"));
-      if (geminiModel) {
-        cachedModel = geminiModel.name.replace(/^models\//, "");
-        return cachedModel;
-      }
-    } else {
-      const errorJson = await res.json().catch(() => ({}));
-      if (errorJson.error?.message) {
-        throw new Error(`Google API: ${errorJson.error.message}`);
-      }
-    }
-  } catch (e) {
-    console.warn("Error descubriendo modelos:", e.message);
-    if (e.message.includes("API key not valid") || e.message.includes("API_KEY_INVALID")) {
-      throw e;
-    }
-  }
-
-  // Fallback por defecto
-  cachedModel = "gemini-1.5-flash";
-  return cachedModel;
+  return "gemini-3.8-flash";
 }
 
 // Llamada a la API de Gemini
