@@ -135,11 +135,8 @@
     const sendBtn = document.getElementById("chat-send-btn");
     const chips = document.getElementById("chat-chips");
 
-    // Historial inicial
-    chatHistory.push({
-      sender: "bot",
-      text: "¡Saludos! Soy AgroAsistente 2030, el asistente del Master Plan Nacional Venezuela Ganadera 2030. ¿En qué te puedo orientar hoy?"
-    });
+    // Historial inicial vacío (la primera interacción siempre debe ser del usuario)
+    chatHistory = [];
 
     // Abrir/Cerrar
     function toggleChat(forceOpen = null) {

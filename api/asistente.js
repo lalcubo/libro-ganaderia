@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 
 function getSql() {
-  const connStr = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+  const connStr = process.env.POSTGRES_URL || process.env.DATABASE_URL || process.env.POSTGRES_URL_NON_POOLING;
   if (!connStr) return null;
   return neon(connStr);
 }
@@ -42,7 +42,7 @@ CONOCIMIENTO BASE DEL PLAN VENEZUELA GANADERA 2030:
 - Financiamiento Especial: FONDONAGA (Fondo Nacional Ganadero propuesto para apalancar créditos e inversión con reglas claras).
 
 INSTRUCCIONES DE USO DE HERRAMIENTAS:
-- Si un usuario pregunta si su propuesta está registrada o quiere saber el estado de su proyecto y te da su cédula o nombre, DEBES USAR la herramienta 'consultar_propuesta'.
+- Si un usuario pregunta si hay propuestas de un tema (ej: paneles solares, pastos, genética, etc.) o pregunta por su propuesta con cédula o nombre, DEBES USAR la herramienta 'consultar_propuesta'.
 - Si pregunta si su firma o adhesión está en el sistema, DEBES USAR 'consultar_adhesion'.
 - Si pregunta cuántas propuestas o adhesiones van en un estado o en el país, DEBES USAR 'obtener_estadisticas'.
 - Si NO tienes herramientas que apliquen (por ejemplo, preguntas generales sobre el libro, los macroejes o cómo participar), responde directamente con tu conocimiento.
@@ -52,7 +52,7 @@ INSTRUCCIONES DE USO DE HERRAMIENTAS:
 const TOOLS_DECLARATIONS = [
   {
     name: "consultar_propuesta",
-    description: "Busca en la base de datos si existe una propuesta registrada por un productor, usando su número de cédula o una palabra clave del título.",
+    description: "Busca en la base de datos si existen propuestas registradas por productores mediante su número de cédula o palabra clave sobre el tema.",
     parameters: {
       type: "OBJECT",
       properties: {
@@ -62,7 +62,7 @@ const TOOLS_DECLARATIONS = [
         },
         palabraClave: {
           type: "STRING",
-          description: "Palabra clave o título de la propuesta para buscar"
+          description: "Palabra clave o tema de la propuesta (ej: solar, pasto, genética, queso)"
         }
       }
     }
@@ -97,7 +97,7 @@ const TOOLS_DECLARATIONS = [
 ];
 
 // Ejecución local de herramientas en Neon Postgres
-async function ejecutarHerramienta(name, args) {
+async function ejecutarHerramienta(name, args = {}) {
   const sql = getSql();
 
   try {
@@ -108,7 +108,7 @@ async function ejecutarHerramienta(name, args) {
       if (!sql) {
         return {
           encontrado: false,
-          mensaje: "La base de datos en vivo está desconectada temporalmente en este entorno."
+          mensaje: "La base de datos de propuestas aún no está configurada o conectada en este entorno."
         };
       }
 
@@ -118,21 +118,24 @@ async function ejecutarHerramienta(name, args) {
           SELECT id, cedula, nombre, estado, macroeje, titulo, detalle, fecha 
           FROM propuestas 
           WHERE cedula LIKE ${'%' + numCedula + '%'}
-          ORDER BY fecha DESC LIMIT 3;
+          ORDER BY fecha DESC LIMIT 4;
         `;
-      } else if (palabra.length >= 3) {
+      } else if (palabra.length >= 2) {
         rows = await sql`
           SELECT id, cedula, nombre, estado, macroeje, titulo, detalle, fecha 
           FROM propuestas 
           WHERE LOWER(titulo) LIKE ${'%' + palabra + '%'} OR LOWER(detalle) LIKE ${'%' + palabra + '%'}
-          ORDER BY fecha DESC LIMIT 3;
+          ORDER BY fecha DESC LIMIT 4;
         `;
       }
 
-      if (rows.length === 0) {
+      if (!rows || rows.length === 0) {
         return {
           encontrado: false,
-          mensaje: "No se encontraron propuestas con los datos proporcionados. Invita al productor a registrarla desde la sección 'Presentar Propuesta' del portal."
+          total: 0,
+          mensaje: palabra 
+            ? `No se encontraron propuestas registradas que mencionen '${palabra}'. Invita al usuario a postular una propuesta en el portal.`
+            : "No se encontraron propuestas registradas con esos datos."
         };
       }
 
@@ -167,10 +170,10 @@ async function ejecutarHerramienta(name, args) {
         LIMIT 1;
       `;
 
-      if (rows.length === 0) {
+      if (!rows || rows.length === 0) {
         return {
           encontrado: false,
-          mensaje: "No se encontró ningún registro de adhesión con esa cédula. Puedes invitar a la persona a adherirse haciendo clic en el botón 'Adherirme al Proyecto'."
+          mensaje: "No se encontró ningún registro de adhesión con esa cédula. Puedes invitar a la persona a sumarse pulsando el botón 'Adherirme al Proyecto'."
         };
       }
 
@@ -182,7 +185,7 @@ async function ejecutarHerramienta(name, args) {
 
     if (name === "obtener_estadisticas") {
       if (!sql) {
-        return { totalPropuestas: 0, totalAdhesiones: 0, nota: "Modo demostración" };
+        return { totalPropuestas: 0, totalAdhesiones: 0, nota: "Base de datos no conectada" };
       }
 
       const estado = (args.estado || "").trim();
@@ -210,18 +213,22 @@ async function ejecutarHerramienta(name, args) {
 
     return { error: `Herramienta desconocida: ${name}` };
   } catch (err) {
-    console.error("Error en ejecución de herramienta:", err);
-    return { error: "Hubo un error al consultar los datos del sistema." };
+    console.error("Error en ejecución de herramienta SQL:", err.message);
+    return {
+      encontrado: false,
+      mensaje: "No fue posible consultar la base de datos en este instante (" + err.message + ")."
+    };
   }
 }
 
-// Llamada a la API de Gemini
+// Llamada a la API de Gemini asegurando alternancia estricta de roles
 async function llamarGemini(apiKey, contents, toolsDeclarations = null) {
   const models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"];
+  let lastError = null;
 
   for (const model of models) {
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
       const payload = {
         system_instruction: {
           parts: [{ text: SYSTEM_PROMPT }]
@@ -250,16 +257,65 @@ async function llamarGemini(apiKey, contents, toolsDeclarations = null) {
       if (!response.ok) {
         const errorText = await response.text();
         console.warn(`Error llamando a Gemini (${model}):`, response.status, errorText);
-        // Si es 404, probamos el siguiente modelo
-        if (response.status === 404) continue;
-        throw new Error(`Gemini API respondió ${response.status}: ${errorText}`);
+        lastError = `Gemini (${model}) ${response.status}: ${errorText}`;
+        if (response.status === 404 || response.status === 503) continue;
+        throw new Error(lastError);
       }
 
       return await response.json();
     } catch (err) {
-      if (model === models[models.length - 1]) throw err;
+      lastError = err.message;
+      if (model === models[models.length - 1]) throw new Error(lastError);
     }
   }
+}
+
+// Normalizar historial para cumplir con las reglas estrictas de Gemini
+function prepararContents(history, nuevoMensaje) {
+  const list = [];
+
+  if (Array.isArray(history)) {
+    for (const item of history.slice(-6)) {
+      if (!item || !item.text) continue;
+      const role = item.sender === "user" ? "user" : "model";
+      list.push({ role, text: String(item.text).trim() });
+    }
+  }
+
+  // Filtrar para que SIEMPRE empiece con un mensaje de 'user'
+  while (list.length > 0 && list[0].role !== "user") {
+    list.shift();
+  }
+
+  const contents = [];
+  let ultimoRol = null;
+
+  for (const item of list) {
+    if (item.role === ultimoRol) {
+      // Si dos seguidos tienen el mismo rol, combinamos el texto
+      if (contents.length > 0) {
+        contents[contents.length - 1].parts[0].text += "\n" + item.text;
+      }
+    } else {
+      contents.push({
+        role: item.role,
+        parts: [{ text: item.text }]
+      });
+      ultimoRol = item.role;
+    }
+  }
+
+  // Agregar el mensaje actual del usuario garantizando alternancia
+  if (ultimoRol === "user" && contents.length > 0) {
+    contents[contents.length - 1].parts[0].text += "\n" + nuevoMensaje;
+  } else {
+    contents.push({
+      role: "user",
+      parts: [{ text: nuevoMensaje }]
+    });
+  }
+
+  return contents;
 }
 
 export default async function handler(req, res) {
@@ -275,11 +331,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ success: false, error: "Método no permitido" });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKeyRaw = process.env.GEMINI_API_KEY || "";
+  const apiKey = apiKeyRaw.replace(/['"]/g, "").trim();
+
   if (!apiKey || apiKey === "PEGA_AQUI_TU_API_KEY_DE_GEMINI") {
     return res.status(200).json({
       success: true,
-      reply: "¡Hola! Soy **AgroAsistente 2030**. Para activarme por completo, por favor configura tu clave de Gemini (`GEMINI_API_KEY`) en el archivo `.env` o en el panel de Vercel. Puedes obtenerla gratis en [aistudio.google.com](https://aistudio.google.com/)."
+      reply: "¡Hola! Soy **AgroAsistente 2030**. Para activarme por completo, asegúrate de configurar tu clave de Gemini (`GEMINI_API_KEY`) en el panel de Vercel (o en tu archivo `.env`). Puedes obtenerla gratis en [aistudio.google.com](https://aistudio.google.com/)."
     });
   }
 
@@ -289,24 +347,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, error: "El mensaje es requerido" });
     }
 
-    // Preparar historial compatible con Gemini
-    const contents = [];
-    if (Array.isArray(history)) {
-      for (const item of history.slice(-6)) {
-        if (item.sender === "user" || item.sender === "bot") {
-          contents.push({
-            role: item.sender === "user" ? "user" : "model",
-            parts: [{ text: item.text }]
-          });
-        }
-      }
-    }
-
-    // Agregar el mensaje actual del usuario
-    contents.push({
-      role: "user",
-      parts: [{ text: message }]
-    });
+    const cleanMessage = message.trim();
+    const contents = prepararContents(history, cleanMessage);
 
     // 1ra Llamada a Gemini (con herramientas disponibles)
     const geminiRes = await llamarGemini(apiKey, contents, TOOLS_DECLARATIONS);
@@ -365,10 +407,18 @@ export default async function handler(req, res) {
     });
 
   } catch (err) {
-    console.error("Error en endpoint asistente:", err);
-    return res.status(500).json({
+    console.error("Error en endpoint asistente:", err.message);
+
+    let mensajeAmigable = "Ocurrió un error al comunicar con el asistente. Por favor, intenta de nuevo.";
+    if (err.message.includes("API_KEY_INVALID")) {
+      mensajeAmigable = "⚠️ **Clave de Gemini no válida:** Verifica que en Vercel la variable `GEMINI_API_KEY` tenga la clave exacta copiada de Google AI Studio (comienza por `AIzaSy...`).";
+    } else {
+      mensajeAmigable = `⚠️ Hubo un detalle técnico: ${err.message}`;
+    }
+
+    return res.status(200).json({
       success: false,
-      reply: "Ocurrió un error al comunicar con el asistente. Por favor, intenta de nuevo en unos momentos.",
+      reply: mensajeAmigable,
       error: err.message
     });
   }
