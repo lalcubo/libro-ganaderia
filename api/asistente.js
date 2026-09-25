@@ -96,7 +96,7 @@ const TOOLS_DECLARATIONS = [
   }
 ];
 
-// Ejecución local de herramientas en Neon Postgres
+// Ejecución de herramientas en Neon Postgres
 async function ejecutarHerramienta(name, args = {}) {
   const sql = getSql();
 
@@ -134,7 +134,7 @@ async function ejecutarHerramienta(name, args = {}) {
           encontrado: false,
           total: 0,
           mensaje: palabra 
-            ? `No se encontraron propuestas registradas que mencionen '${palabra}'. Invita al usuario a postular una propuesta en el portal.`
+            ? `No se encontraron propuestas registradas con el término '${palabra}'. Invita al usuario a postular su proyecto en la sección 'Presentar Propuesta'.`
             : "No se encontraron propuestas registradas con esos datos."
         };
       }
@@ -221,53 +221,93 @@ async function ejecutarHerramienta(name, args = {}) {
   }
 }
 
-// Llamada a la API de Gemini asegurando alternancia estricta de roles
-async function llamarGemini(apiKey, contents, toolsDeclarations = null) {
-  const models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"];
-  let lastError = null;
+// Descubrimiento dinámico del mejor modelo disponible para la API Key
+let cachedModel = null;
 
-  for (const model of models) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-      const payload = {
-        system_instruction: {
-          parts: [{ text: SYSTEM_PROMPT }]
-        },
-        contents: contents,
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 900
-        }
-      };
+async function obtenerModeloDisponible(apiKey) {
+  if (cachedModel) return cachedModel;
 
-      if (toolsDeclarations && toolsDeclarations.length > 0) {
-        payload.tools = [
-          {
-            function_declarations: toolsDeclarations
-          }
-        ];
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
+    if (res.ok) {
+      const data = await res.json();
+      const models = data.models || [];
+      
+      // Filtrar los que admiten generateContent
+      const compatibles = models.filter(m => 
+        Array.isArray(m.supportedGenerationMethods) && 
+        m.supportedGenerationMethods.includes("generateContent")
+      );
+
+      // Prioridad 1: modelos flash (rápidos y económicos)
+      const flashModel = compatibles.find(m => m.name.includes("flash"));
+      if (flashModel) {
+        cachedModel = flashModel.name.replace(/^models\//, "");
+        return cachedModel;
       }
 
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.warn(`Error llamando a Gemini (${model}):`, response.status, errorText);
-        lastError = `Gemini (${model}) ${response.status}: ${errorText}`;
-        if (response.status === 404 || response.status === 503) continue;
-        throw new Error(lastError);
+      // Prioridad 2: cualquier modelo gemini compatible
+      const geminiModel = compatibles.find(m => m.name.includes("gemini"));
+      if (geminiModel) {
+        cachedModel = geminiModel.name.replace(/^models\//, "");
+        return cachedModel;
       }
-
-      return await response.json();
-    } catch (err) {
-      lastError = err.message;
-      if (model === models[models.length - 1]) throw new Error(lastError);
+    } else {
+      const errorJson = await res.json().catch(() => ({}));
+      if (errorJson.error?.message) {
+        throw new Error(`Google API: ${errorJson.error.message}`);
+      }
+    }
+  } catch (e) {
+    console.warn("Error descubriendo modelos:", e.message);
+    if (e.message.includes("API key not valid") || e.message.includes("API_KEY_INVALID")) {
+      throw e;
     }
   }
+
+  // Fallback por defecto
+  cachedModel = "gemini-1.5-flash";
+  return cachedModel;
+}
+
+// Llamada a la API de Gemini
+async function llamarGemini(apiKey, contents, toolsDeclarations = null) {
+  const model = await obtenerModeloDisponible(apiKey);
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const payload = {
+    system_instruction: {
+      parts: [{ text: SYSTEM_PROMPT }]
+    },
+    contents: contents,
+    generationConfig: {
+      temperature: 0.4,
+      maxOutputTokens: 900
+    }
+  };
+
+  if (toolsDeclarations && toolsDeclarations.length > 0) {
+    payload.tools = [
+      {
+        function_declarations: toolsDeclarations
+      }
+    ];
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    const errorMsg = data.error?.message || `HTTP ${response.status}`;
+    throw new Error(`Google (${model}): ${errorMsg}`);
+  }
+
+  return data;
 }
 
 // Normalizar historial para cumplir con las reglas estrictas de Gemini
@@ -292,7 +332,6 @@ function prepararContents(history, nuevoMensaje) {
 
   for (const item of list) {
     if (item.role === ultimoRol) {
-      // Si dos seguidos tienen el mismo rol, combinamos el texto
       if (contents.length > 0) {
         contents[contents.length - 1].parts[0].text += "\n" + item.text;
       }
@@ -337,7 +376,7 @@ export default async function handler(req, res) {
   if (!apiKey || apiKey === "PEGA_AQUI_TU_API_KEY_DE_GEMINI") {
     return res.status(200).json({
       success: true,
-      reply: "¡Hola! Soy **AgroAsistente 2030**. Para activarme por completo, asegúrate de configurar tu clave de Gemini (`GEMINI_API_KEY`) en el panel de Vercel (o en tu archivo `.env`). Puedes obtenerla gratis en [aistudio.google.com](https://aistudio.google.com/)."
+      reply: "¡Hola! Soy **AgroAsistente 2030**. Para activarme por completo, asegúrate de configurar tu clave de Gemini (`GEMINI_API_KEY`) en el panel de Vercel. Puedes obtenerla gratis en [aistudio.google.com](https://aistudio.google.com/)."
     });
   }
 
@@ -353,13 +392,14 @@ export default async function handler(req, res) {
     // 1ra Llamada a Gemini (con herramientas disponibles)
     const geminiRes = await llamarGemini(apiKey, contents, TOOLS_DECLARATIONS);
 
-    const candidate = geminiRes.candidates?.[0];
-    if (!candidate) {
+    if (!geminiRes || !geminiRes.candidates || geminiRes.candidates.length === 0) {
       return res.status(200).json({
         success: true,
-        reply: "Disculpa, no pude procesar la respuesta en este momento. Por favor intenta de nuevo."
+        reply: "No pude obtener una respuesta estructurada en este momento. Por favor reformula tu consulta."
       });
     }
+
+    const candidate = geminiRes.candidates[0];
 
     // Verificar si Gemini decidió llamar a una herramienta (Function Calling)
     const parts = candidate.content?.parts || [];
@@ -391,7 +431,7 @@ export default async function handler(req, res) {
 
       // 2da Llamada a Gemini para sintetizar la respuesta final en lenguaje natural
       const finalRes = await llamarGemini(apiKey, contents, null);
-      const finalText = finalRes.candidates?.[0]?.content?.parts?.[0]?.text;
+      const finalText = finalRes?.candidates?.[0]?.content?.parts?.[0]?.text;
 
       return res.status(200).json({
         success: true,
@@ -409,11 +449,9 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error("Error en endpoint asistente:", err.message);
 
-    let mensajeAmigable = "Ocurrió un error al comunicar con el asistente. Por favor, intenta de nuevo.";
-    if (err.message.includes("API_KEY_INVALID")) {
+    let mensajeAmigable = `⚠️ Detalle: ${err.message}`;
+    if (err.message.includes("API key not valid") || err.message.includes("API_KEY_INVALID")) {
       mensajeAmigable = "⚠️ **Clave de Gemini no válida:** Verifica que en Vercel la variable `GEMINI_API_KEY` tenga la clave exacta copiada de Google AI Studio (comienza por `AIzaSy...`).";
-    } else {
-      mensajeAmigable = `⚠️ Hubo un detalle técnico: ${err.message}`;
     }
 
     return res.status(200).json({
