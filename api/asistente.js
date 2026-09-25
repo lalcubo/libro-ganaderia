@@ -34,51 +34,28 @@ const STOPWORDS = new Set([
   "las", "los", "una", "uno", "unos", "unas", "con", "sin", "registrada", "registrado", "tienen"
 ]);
 
+function normTexto(str) {
+  return (str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 // Investigar en la base de datos de Neon según el mensaje del usuario
 async function investigarEnBaseDeDatos(mensaje) {
   const sql = getSql();
   if (!sql) {
-    return "Nota del sistema: Base de datos no conectada en este entorno.";
+    return {
+      contextoTexto: "Nota del sistema: Base de datos no conectada en este entorno.",
+      propuestasCoincidentes: []
+    };
   }
 
   const secciones = [];
   const cedulaCoincidencias = mensaje.match(/\b\d{5,9}\b/g);
+  let coincidentes = [];
 
   try {
-    // 1. Si el usuario escribió un número de cédula, buscar exactamente por esa cédula
-    if (cedulaCoincidencias && cedulaCoincidencias.length > 0) {
-      for (const num of cedulaCoincidencias.slice(0, 2)) {
-        const propsCedula = await sql`
-          SELECT titulo, macroeje, estado, fecha, detalle, nombre 
-          FROM propuestas 
-          WHERE cedula LIKE ${'%' + num + '%'} 
-          LIMIT 4;
-        `;
-
-        const adhsCedula = await sql`
-          SELECT nombre, estado, sector, asociacion, fecha 
-          FROM adhesiones 
-          WHERE cedula LIKE ${'%' + num + '%'} 
-          LIMIT 1;
-        `;
-
-        if (propsCedula.length > 0) {
-          secciones.push(`[PROPUESTAS DE LA CÉDULA ${num}]: ` + JSON.stringify(propsCedula));
-        } else {
-          secciones.push(`[BÚSQUEDA POR CÉDULA ${num}]: No figura ninguna propuesta registrada con esta cédula.`);
-        }
-
-        if (adhsCedula.length > 0) {
-          secciones.push(`[ADHESIÓN DE LA CÉDULA ${num}]: Registrada a nombre de ${adhsCedula[0].nombre} en ${adhsCedula[0].estado} (${adhsCedula[0].fecha}).`);
-        } else {
-          secciones.push(`[ADHESIÓN DE LA CÉDULA ${num}]: No figura registro de adhesión con esta cédula.`);
-        }
-      }
-    }
-
-    // 2. Traer las propuestas reales del portal para análisis semántico (sin importar tildes ni palabras de enlace)
+    // 1. Traer las propuestas reales del portal
     const todasLasPropuestas = await sql`
-      SELECT titulo, macroeje, estado, nombre, fecha, detalle 
+      SELECT id, cedula, titulo, macroeje, estado, nombre, fecha, detalle 
       FROM propuestas 
       ORDER BY fecha DESC, id DESC 
       LIMIT 60;
@@ -90,8 +67,48 @@ async function investigarEnBaseDeDatos(mensaje) {
       ).join("\n");
 
       secciones.push(`[PROPUESTAS REGISTRADAS EN EL PORTAL (${todasLasPropuestas.length} propuestas encontradas)]:\n${listaFormateada}`);
+
+      // Filtrar coincidentes para el carrusel
+      if (cedulaCoincidencias && cedulaCoincidencias.length > 0) {
+        coincidentes = todasLasPropuestas.filter(p => 
+          cedulaCoincidencias.some(c => (p.cedula || "").includes(c))
+        );
+      } else {
+        const msgNorm = normTexto(mensaje);
+        const palabras = msgNorm
+          .replace(/[¿?¡!.,;:()]/g, " ")
+          .split(/\s+/)
+          .filter(w => w.length >= 3 && !STOPWORDS.has(w));
+
+        if (palabras.length > 0) {
+          coincidentes = todasLasPropuestas.filter(p => {
+            const contenido = normTexto(`${p.titulo} ${p.detalle} ${p.macroeje} ${p.estado} ${p.nombre}`);
+            return palabras.some(w => contenido.includes(w));
+          });
+        } else if (/\b(propuestas?|proyectos?|iniciativas?)\b/i.test(mensaje)) {
+          coincidentes = todasLasPropuestas.slice(0, 6);
+        }
+      }
     } else {
       secciones.push(`[REGISTRO ACTUAL DE PROPUESTAS]: Actualmente no hay propuestas registradas en la base de datos.`);
+    }
+
+    // 2. Si el usuario escribió un número de cédula, buscar adhesión
+    if (cedulaCoincidencias && cedulaCoincidencias.length > 0) {
+      for (const num of cedulaCoincidencias.slice(0, 2)) {
+        const adhsCedula = await sql`
+          SELECT nombre, estado, sector, asociacion, fecha 
+          FROM adhesiones 
+          WHERE cedula LIKE ${'%' + num + '%'} 
+          LIMIT 1;
+        `;
+
+        if (adhsCedula.length > 0) {
+          secciones.push(`[ADHESIÓN DE LA CÉDULA ${num}]: Registrada a nombre de ${adhsCedula[0].nombre} en ${adhsCedula[0].estado} (${adhsCedula[0].fecha}).`);
+        } else {
+          secciones.push(`[ADHESIÓN DE LA CÉDULA ${num}]: No figura registro de adhesión con esta cédula.`);
+        }
+      }
     }
 
     // 3. Métricas y estadísticas en tiempo real
@@ -104,7 +121,10 @@ async function investigarEnBaseDeDatos(mensaje) {
     secciones.push("Nota: Ocurrió un detalle al consultar los datos en vivo: " + err.message);
   }
 
-  return secciones.join("\n\n");
+  return {
+    contextoTexto: secciones.join("\n\n"),
+    propuestasCoincidentes: coincidentes.slice(0, 8)
+  };
 }
 
 // Descripción del conocimiento del Plan Venezuela Ganadera 2030
@@ -238,7 +258,7 @@ Pregunta del usuario:
 "${cleanMessage}"
 
 [INFORMACIÓN VERIFICADA EN BASE DE DATOS DEL SISTEMA]:
-${datosInvestigados}
+${datosInvestigados.contextoTexto}
 
 Instrucción: Responde a la pregunta del usuario utilizando la información verificada de la base de datos cuando aplique, y tus conocimientos del Plan Venezuela Ganadera 2030. Si no hay registros de lo que busca, explícaselo amablemente e invítalo a participar.
     `.trim();
@@ -302,7 +322,8 @@ Instrucción: Responde a la pregunta del usuario utilizando la información veri
 
     return res.status(200).json({
       success: true,
-      reply: replyText
+      reply: replyText,
+      proposals: datosInvestigados.propuestasCoincidentes || []
     });
 
   } catch (err) {

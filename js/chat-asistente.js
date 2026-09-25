@@ -157,7 +157,66 @@
     closeBtn.addEventListener("click", () => toggleChat(false));
 
     // Agregar mensaje a la vista
-    function appendMessage(sender, text) {
+    // Renderizar carrusel deslizable horizontal de tarjetas de propuestas
+    function renderProposalsCarousel(proposals) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "chat-carousel-wrapper";
+
+      const count = proposals.length;
+      wrapper.innerHTML = `
+        <div class="chat-carousel-header">
+          <span class="chat-carousel-hint">
+            <i class="fa-solid fa-layer-group"></i> ${count} ${count === 1 ? "Propuesta encontrada" : "Propuestas encontradas"}
+          </span>
+          ${count > 1 ? `
+            <div class="chat-carousel-arrows">
+              <button type="button" class="chat-carousel-arrow prev" aria-label="Anterior"><i class="fa-solid fa-chevron-left"></i></button>
+              <button type="button" class="chat-carousel-arrow next" aria-label="Siguiente"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          ` : ""}
+        </div>
+        <div class="chat-carousel">
+          ${proposals.map(p => `
+            <div class="chat-proposal-card">
+              <div class="chat-card-top">
+                <span class="chat-card-badge" title="${p.macroeje || 'General'}">${p.macroeje || 'Propuesta'}</span>
+                <span class="chat-card-date">${p.fecha || ''}</span>
+              </div>
+              <h5 class="chat-card-title">${p.titulo || 'Sin título'}</h5>
+              <p class="chat-card-desc">${p.detalle || ''}</p>
+              <div class="chat-card-footer">
+                <div class="chat-card-author" title="${p.nombre || ''}">
+                  <i class="fa-solid fa-user"></i>
+                  <span>${p.nombre || 'Ciudadano'}</span>
+                </div>
+                <div class="chat-card-state">
+                  <i class="fa-solid fa-location-dot"></i>
+                  <span>${p.estado || 'Venezuela'}</span>
+                </div>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+
+      const carousel = wrapper.querySelector(".chat-carousel");
+      const prevBtn = wrapper.querySelector(".chat-carousel-arrow.prev");
+      const nextBtn = wrapper.querySelector(".chat-carousel-arrow.next");
+
+      if (prevBtn && nextBtn && carousel) {
+        prevBtn.addEventListener("click", () => {
+          carousel.scrollBy({ left: -250, behavior: "smooth" });
+        });
+        nextBtn.addEventListener("click", () => {
+          carousel.scrollBy({ left: 250, behavior: "smooth" });
+        });
+      }
+
+      return wrapper;
+    }
+
+    // Agregar mensaje a la vista
+    function appendMessage(sender, text, proposals = []) {
       const msgEl = document.createElement("div");
       msgEl.className = `chat-msg ${sender}`;
 
@@ -170,11 +229,18 @@
         bubble.textContent = text;
       }
 
+      msgEl.appendChild(bubble);
+
+      // Si hay propuestas encontradas, agregar el carrusel de tarjetas debajo del texto
+      if (sender === "bot" && Array.isArray(proposals) && proposals.length > 0) {
+        const carouselEl = renderProposalsCarousel(proposals);
+        msgEl.appendChild(carouselEl);
+      }
+
       const timeEl = document.createElement("span");
       timeEl.className = "chat-msg-time";
       timeEl.textContent = getHoraActual();
 
-      msgEl.appendChild(bubble);
       msgEl.appendChild(timeEl);
       messages.appendChild(msgEl);
 
@@ -229,7 +295,7 @@
         removeTypingIndicator();
 
         const botReply = data.reply || "No obtuve respuesta del asistente.";
-        appendMessage("bot", botReply);
+        appendMessage("bot", botReply, data.proposals || []);
         chatHistory.push({ sender: "bot", text: botReply });
 
       } catch (err) {
