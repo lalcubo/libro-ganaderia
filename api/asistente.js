@@ -295,12 +295,22 @@ Instrucción: Responde a la pregunta del usuario utilizando la información veri
       }
     };
 
-    // 3. LLAMADA DIRECTA A GEMINI 3.8 FLASH CON REINTENTO AUTOMÁTICO
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+    // 3. LLAMADA EN CASCADA CON FALLBACK AUTOMÁTICO DE MODELOS
+    // Si un modelo alcanza su límite diario (RPD de 20), pasa automáticamente a los de 500 RPD
+    const MODELOS_CASCADA = [
+      "gemini-3.8-flash",      // Prioridad 1: Máxima calidad (20 RPD)
+      "gemini-3.5-flash-lite", // Prioridad 2: Respaldo de alta velocidad (500 RPD)
+      "gemini-3.1-flash-lite", // Prioridad 3: Segundo respaldo (500 RPD)
+      "gemini-3.7-flash"       // Prioridad 4: Respaldo adicional
+    ];
+
     let replyText = null;
+    let modeloUsado = null;
     let lastError = null;
 
-    for (let intento = 1; intento <= 3; intento++) {
+    for (const modelo of MODELOS_CASCADA) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      
       try {
         const response = await fetch(url, {
           method: "POST",
@@ -312,20 +322,17 @@ Instrucción: Responde a la pregunta del usuario utilizando la información veri
 
         if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
           replyText = data.candidates[0].content.parts[0].text;
-          break; // Éxito
+          modeloUsado = modelo;
+          break; // Éxito con este modelo, salimos de la cascada
         }
 
-        lastError = data.error?.message || `HTTP ${response.status}`;
-        
-        // Si hay sobrecarga temporal, esperar antes del siguiente intento
-        if (intento < 3) {
-          await new Promise(r => setTimeout(r, 800 * intento));
-        }
+        const errMsg = data.error?.message || `HTTP ${response.status}`;
+        lastError = `${modelo}: ${errMsg}`;
+        console.warn(`[Fallback Asistente] Modelo ${modelo} no disponible (${errMsg}). Conmutando al siguiente...`);
+
       } catch (e) {
-        lastError = e.message;
-        if (intento < 3) {
-          await new Promise(r => setTimeout(r, 800 * intento));
-        }
+        lastError = `${modelo}: ${e.message}`;
+        console.warn(`[Fallback Asistente] Error de conexión con ${modelo} (${e.message}). Conmutando al siguiente...`);
       }
     }
 
@@ -336,7 +343,7 @@ Instrucción: Responde a la pregunta del usuario utilizando la información veri
           reply: "Los servidores de Google reportan alta demanda momentánea. Por favor envía de nuevo tu consulta en unos segundos."
         });
       }
-      throw new Error(`Google API: ${lastError || "Sin respuesta"}`);
+      throw new Error(`Google API: ${lastError || "Sin respuesta de ningún modelo en cascada"}`);
     }
 
     return res.status(200).json({
